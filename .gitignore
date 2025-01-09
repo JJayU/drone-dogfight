@@ -1,0 +1,8 @@
+# Wyklucz build/ i install/
+build/
+install/
+log/
+
+# Pliki tymczasowe
+*.pyc
+__pycache__/
