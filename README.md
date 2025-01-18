@@ -9,15 +9,17 @@
 
 The main goal of the project was to develop a control system for the Crazyflie 2.1 drone equipped with a laser, enabling it to precisely track a moving target. The system allowed the drone to ascend to the target's height and rotate toward it, ensuring accurate pointing with the laser. The project aimed to leverage modern programming tools and technologies to create a comprehensive simulation and control environment.
 
-## Setup
+
+## Setup & Run
 #Add to bashrc
+
+```bash
 cd ..
 cd ros2_ws
 export PYTHONPATH=/crazyflie-firmware/build:$PYTHONPATH
 source /opt/ros/humble/setup.bash
 source /home/ros2_ws/install/setup.bash
-
-## Run
+```
 
 ## Documentation
 ### 1. Crazyflie 2.1
