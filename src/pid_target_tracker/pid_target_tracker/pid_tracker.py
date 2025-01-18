@@ -11,31 +11,26 @@ import numpy as np
 class VirtualTargetTracker(Node):
     def __init__(self):
         super().__init__('virtual_target_tracker')
+
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+
         self.imu_sub = self.create_subscription(Imu, '/imu', self.imu_callback, 10)
         self.gps_sub = self.create_subscription(PointStamped, '/crazyflie_1/gps', self.gps_callback, 10)
-        
+        self.target_sub = self.create_subscription(PointStamped, '/target_point', self.target_callback, 10)
+
         self.initial_pos = None
         self.drone_pos = {'x': 0.0, 'y': 0.0, 'z': 0.0}
         self.current_yaw = 0.0
+
+        self.target_pos = None
         
-        self.points = [
-            {'x': 0.2, 'y': 0.0, 'z': 0.5},
-            {'x': 0.1, 'y': 0.17, 'z': 0.8},
-            {'x': -0.1, 'y': 0.17, 'z': 1.0},
-            {'x': -0.2, 'y': 0.0, 'z': 1.2},
-            {'x': -0.1, 'y': -0.17, 'z': 0.9},
-            {'x': 0.1, 'y': -0.17, 'z': 0.6}
-        ]
-        
-        self.current_point_idx = 0
         self.point_achieved_time = None
         self.point_wait_time = 2.0
         
         # Zmniejsz wzmocnienie PID
         self.pid = {
-            'yaw': {'kp': 10.0, 'ki': 0.0, 'kd': 3.5, 'integral': 0.0, 'prev_error': 0.0},
-            'z': {'kp': 1.0, 'ki': 0.001, 'kd': 0.1, 'integral': 0.0, 'prev_error': 0.0}
+            'yaw': {'kp': 50.0, 'ki': 0.0, 'kd': 8.5, 'integral': 0.0, 'prev_error': 0.0},
+            'z': {'kp': 1.0, 'ki': 0.000, 'kd': 0.1, 'integral': 0.0, 'prev_error': 0.0}
         }
         
         self.yaw_threshold = math.radians(5)
@@ -78,39 +73,31 @@ class VirtualTargetTracker(Node):
             angle += 2 * math.pi
         return angle
 
-    def is_yaw_achieved(self, yaw_error):
-        return abs(yaw_error) < self.yaw_threshold
+    def target_callback(self, msg: PointStamped):
+        self.target_pos = {'x': msg.point.x, 'y': msg.point.y, 'z': msg.point.z}
+        self.get_logger().info(f"Received new target: x={msg.point.x}, y={msg.point.y}, z={msg.point.z}")
 
     def control_loop(self):
-        current_target = self.points[self.current_point_idx]
-        
-        # Oblicz kąt do celu w zakresie -pi do pi
-        target_yaw = -math.atan2(current_target['x'] - self.drone_pos['x'] , current_target['y'] - self.drone_pos['y']) + math.pi/2
+
+        if self.target_pos is None:
+            self.get_logger().info("No target received yet.")
+            return
+
+        target_yaw = math.atan2(self.target_pos['y'] - self.drone_pos['y'],
+                                self.target_pos['x'] - self.drone_pos['x'])
         yaw_error = self.normalize_angle(target_yaw - self.current_yaw)
-        
-        if self.is_yaw_achieved(yaw_error):
-            if self.point_achieved_time is None:
-                self.point_achieved_time = self.get_clock().now()
-                self.get_logger().info(f'Reached point {self.current_point_idx + 1} orientation!')
-            elif (self.get_clock().now() - self.point_achieved_time).nanoseconds / 1e9 >= self.point_wait_time:
-                self.current_point_idx = (self.current_point_idx + 1) % len(self.points)
-                self.point_achieved_time = None
-                self.get_logger().info(f'Moving to point {self.current_point_idx + 1}')
-        else:
-            self.point_achieved_time = None
         
         # Wyświetl aktualne wartości dla debugowania
         self.get_logger().info(f"""
             Current yaw: {math.degrees(self.current_yaw):.1f}°
             Target yaw: {math.degrees(target_yaw):.1f}°
-            Error: {math.degrees(yaw_error):.1f}°
-            Current point: {self.current_point_idx + 1}
-            Target: x={current_target['x']:.2f}, y={current_target['y']:.2f}
+            Yaw error: {math.degrees(yaw_error):.1f}°
+            Target position: x={self.target_pos['x']:.2f}, y={self.target_pos['y']:.2f}, z={self.target_pos['z']:.2f}
         """)
 
         # Oblicz i wyślij komendy sterujące
         cmd_vel = Twist()
-        dz = current_target['z'] - self.drone_pos['z']
+        dz = self.target_pos['z'] - self.drone_pos['z']
         cmd_vel.linear.z = float(self.calculate_pid(self.pid['z'], dz))
         cmd_vel.angular.z = float(self.calculate_pid(self.pid['yaw'], yaw_error))
         
