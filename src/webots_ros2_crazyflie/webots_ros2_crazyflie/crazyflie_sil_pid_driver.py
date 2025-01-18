@@ -140,7 +140,6 @@ class CrazyflieDriver:
         ## Fill in Setpoints
         # Kontrola wysokości
         self.setpoint.mode.z = firm.modeVelocity
-        self.setpoint.position.z = self.current_linear_z
         self.setpoint.velocity.z = self.current_linear_z
         
         # Kontrola nachylenia (pitch i roll)
