@@ -11,15 +11,25 @@ The main goal of the project was to develop a control system for the Crazyflie 2
 
 
 ## Setup & Run
-#Add to bashrc
 
-```bash
-cd ..
-cd ros2_ws
+###  Install Crazyswarm2 
+[Installation — Crazyswarm2 1.0a1 documentation](https://imrclab.github.io/crazyswarm2/installation.html)
+
+### Add to bashrc
+
+```
 export PYTHONPATH=/crazyflie-firmware/build:$PYTHONPATH
-source /opt/ros/humble/setup.bash
+
+source /opt/ros/<DISTRO>/setup.bash
+
 source /home/ros2_ws/install/setup.bash
 ```
+  
+
+```
+ros2 launch drone_tracker all.launch.py
+  ```
+
 
 ## Documentation
 ### 1. Crazyflie 2.1
@@ -29,13 +39,13 @@ The project utilized the Crazyflie 2.1 drone, a lightweight, modular micro-drone
 ### 2. Control System
 
 **2.1. Altitude Control** A PID controller was implemented to regulate the drone’s altitude. This controller ensured that the drone ascended or descended to match the height of the moving target accurately. The control loop used real-time feedback from the drone’s onboard sensors to maintain stability and precision.
+
 **2.2. Orientation Control** A second PID controller managed the drone’s orientation, calculating the precise yaw angle required to align the laser pointer with the target. This controller enabled the drone to rotate smoothly and maintain accurate tracking of the target's position.
 
 ### 3. Software Implementation 
 
 - **Simulation:** Webots was used as the primary simulation platform to model the drone’s behavior and test the control algorithms in a safe and controlled virtual environment.
 - **Control Framework:** ROS2 (Robot Operating System 2) provided the middleware for communication between system components and facilitated real-time data processing and control.
-- **Programming Language:** Python was employed for implementing the control algorithms and integrating them with the simulation environment.
 - **Visualization:** RViz was utilized for visualizing the drone’s position, orientation, and the target’s movement, aiding in debugging and analysis.
 
 ### 4. Future Enhancements
@@ -57,6 +67,6 @@ __the_HaUBe__ - [Github](https://github.com/theHaUBe) (Hubert Górecki 147599)
 
 ## Bugs & Feature Requests
 
-Please report bugs and request features using the
+Please report bugs and request features using the [Issue Tracker](https://github.com/JJayU/drone-dogfight/issues).
 
 
