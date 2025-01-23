@@ -53,6 +53,9 @@ The project utilized the Crazyflie 2.1 drone, a lightweight, modular micro-drone
 - Integration of obstacle avoidance algorithms to ensure safe operation in cluttered environments.
 - Expansion to multi-drone systems for collaborative tracking and target identification.
 
+### Video preview
+
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/vqMEiRHj4WA/0.jpg)]([https://www.youtube.com/watch?v=])
 
 ## Config files
 
