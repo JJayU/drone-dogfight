@@ -24,11 +24,11 @@ source /opt/ros/<DISTRO>/setup.bash
 
 source /home/ros2_ws/install/setup.bash
 ```
-  
+### Launch
 
 ```
-ros2 launch drone_tracker all.launch.py
-  ```
+ros2 launch pid_target_tracker main_launch.launch.py
+```
 
 
 ## Documentation
