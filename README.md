@@ -55,7 +55,7 @@ The project utilized the Crazyflie 2.1 drone, a lightweight, modular micro-drone
 
 ### Video preview
 
-[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/vqMEiRHj4WA/0.jpg)]([https://www.youtube.com/watch?v=])
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/vqMEiRHj4WA/0.jpg)]([https://www.youtube.com/watch?v=vqMEiRHj4WA])
 
 ## Config files
 
