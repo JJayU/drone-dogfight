@@ -14,7 +14,7 @@ class TFPublisherNode(Node):
         super().__init__('tf_publisher_node')
 
         # Subskrypcje
-        self.gps_sub = self.create_subscription(PointStamped, '/crazyflie_1/gps', self.gps_callback, 10)
+        self.gps_sub = self.create_subscription(PointStamped, '/gps', self.gps_callback, 10)
         self.imu_sub = self.create_subscription(Imu, '/imu', self.imu_callback, 10)
 
         # TransformBroadcaster
