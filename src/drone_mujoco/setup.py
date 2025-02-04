@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+import os
+from glob import glob
 
 package_name = 'drone_mujoco'
 
@@ -10,7 +12,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (package_name + package_name, ['model'])
+        (os.path.join('share', package_name, 'model'), glob('model/*.xml')),
+        (os.path.join('share', package_name, 'model/assets'), glob('model/assets/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -21,7 +24,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'sim = drone_mujoco.sim:main'
+            'sim = drone_mujoco.sim:main',
+            'teleop = drone_mujoco.drone_teleop:main'
         ],
     },
 )

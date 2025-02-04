@@ -7,7 +7,7 @@ import os
 from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import Imu
-
+from ament_index_python.packages import get_package_share_directory
 ###
 # Drone simulation using Mujoco
 # Provides a simulation and a ROS2 interface for a Crazyflie 2.1 model in Mujoco
@@ -17,9 +17,9 @@ class SimNode(Node):
     def __init__(self):
         super().__init__('sim_node')
 
-        path = os.path.join(os.getcwd(), 'build/drone_mujoco/model/scene.xml')
-
-        self.model = mujoco.MjModel.from_xml_path(path)
+        package_share_dir = get_package_share_directory('drone_mujoco')
+        model_path = os.path.join(package_share_dir, 'model', 'scene.xml')
+        self.model = mujoco.MjModel.from_xml_path(model_path)
         self.data = mujoco.MjData(self.model)
         self.viewer = mujoco_viewer.MujocoViewer(self.model, self.data)
 
@@ -42,7 +42,7 @@ class SimNode(Node):
     def motor_listener_callback(self, msg):
         if len(msg.data) == 4:
             m1, m2, m3, m4 = msg.data
-            # self.get_logger().info(f'Otrzymano moce silników: {m1}, {m2}, {m3}, {m4}')
+            self.get_logger().info(f'Otrzymano moce silników: {m1}, {m2}, {m3}, {m4}')
             self.set_control(m1, m2, m3, m4)
         else:
             self.get_logger().warn('Otrzymano niewłaściwą liczbę wartości!')
@@ -81,7 +81,7 @@ class SimNode(Node):
 
             # print(self.data.qpos[:])
 
-            self.set_control(0.03, 0.04, 0.03, 0.04)
+            # self.set_control(0.03, 0.04, 0.03, 0.04)
 
             self.viewer.render()
 
