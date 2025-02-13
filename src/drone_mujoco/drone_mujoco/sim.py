@@ -17,7 +17,7 @@ class SimNode(Node):
     def __init__(self):
         super().__init__('sim_node')
 
-        path = os.path.join(os.getcwd(), 'build/drone_mujoco/model/scene.xml')
+        path = '/home/ws/src/drone_mujoco/model/scene.xml'
 
         self.model = mujoco.MjModel.from_xml_path(path)
         self.data = mujoco.MjData(self.model)
