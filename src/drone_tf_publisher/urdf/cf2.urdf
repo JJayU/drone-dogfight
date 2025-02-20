@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<robot name="crazyflie" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- Główny link robota -->
+  <link name="base_crazyflie">
+    <visual>
+      <geometry>
+        <mesh filename="package://crazyflie_ros2_description/meshes/cf2_assembly.dae" />
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- Link lasera -->
+  <link name="laser_link">
+    <visual>
+      <geometry>
+        <cylinder length="5.0" radius="0.001" />
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1.0" />
+      </material>
+    </visual>
+  </link>
+
+  <!-- Połączenie między base_crazyflie a laser_link -->
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_crazyflie" />
+    <child link="laser_link" />
+    <origin xyz="0 0 0.1" rpy="0 0 0" />
+  </joint>
+
+</robot>

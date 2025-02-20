@@ -78,7 +78,7 @@ class TFPublisherNode(Node):
         # Transformacja (pozycja i orientacja)
         t.transform.translation.x = 2.5
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.0
+        t.transform.translation.z = 0.02
         t.transform.rotation.x = 0.0
         t.transform.rotation.y = 0.7071068
         t.transform.rotation.z = 0.0
