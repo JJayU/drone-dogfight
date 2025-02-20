@@ -7,11 +7,7 @@ import os
 from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import Imu
-
-###
-# Drone simulation using Mujoco
-# Provides a simulation and a ROS2 interface for a Crazyflie 2.1 model in Mujoco
-###
+from ament_index_python.packages import get_package_share_directory
 
 class SimNode(Node):
     def __init__(self):
@@ -23,9 +19,8 @@ class SimNode(Node):
         self.data = mujoco.MjData(self.model)
         self.viewer = mujoco_viewer.MujocoViewer(self.model, self.data)
 
-        self.model.opt.timestep = 0.01
-        self.create_timer(0.01, self.loop)
-
+        self.model.opt.timestep = 0.005
+        self.create_timer(0.005, self.loop)
         self.running = True
 
         self.motor_subscription = self.create_subscription(
@@ -41,52 +36,40 @@ class SimNode(Node):
 
     def motor_listener_callback(self, msg):
         if len(msg.data) == 4:
-            m1, m2, m3, m4 = msg.data
-            # self.get_logger().info(f'Otrzymano moce silników: {m1}, {m2}, {m3}, {m4}')
-            self.set_control(m1, m2, m3, m4)
+            self.set_control(msg.data)
         else:
-            self.get_logger().warn('Otrzymano niewłaściwą liczbę wartości!')
+            self.get_logger().warn('Invalid motor command length!')
 
-    def set_control(self, m1, m2, m3 ,m4):
-        self.data.ctrl[0] = m1
-        self.data.ctrl[1] = m2
-        self.data.ctrl[2] = m3
-        self.data.ctrl[3] = m4
+    def set_control(self, motor_commands):
+        for i in range(4):
+            self.data.ctrl[i] = np.clip(motor_commands[i], 0, 1)
+            # print(f"{motor_commands[i]}")
 
     def publish_state(self):
         x, y, z = self.data.qpos[0:3]
 
-        msg = PointStamped()
-        msg.header.stamp = self.get_clock().now().to_msg() 
-        msg.header.frame_id = "map"
-        msg.point.x, msg.point.y, msg.point.z = x, y, z
-
-        self.gps_publisher.publish(msg)
+        gps_msg = PointStamped()
+        gps_msg.header.stamp = self.get_clock().now().to_msg() 
+        gps_msg.header.frame_id = "map"
+        gps_msg.point.x, gps_msg.point.y, gps_msg.point.z = x, y, z
+        self.gps_publisher.publish(gps_msg)
 
         quaternion = self.data.qpos[3:7]
 
-        msg2 = Imu()
-        msg2.orientation.w = quaternion[0]
-        msg2.orientation.x = quaternion[1]
-        msg2.orientation.y = quaternion[2]
-        msg2.orientation.z = quaternion[3]
-
-        self.imu_publisher.publish(msg2)
-        
+        imu_msg = Imu()
+        imu_msg.header.stamp = self.get_clock().now().to_msg()
+        imu_msg.header.frame_id = "base_link"
+        imu_msg.orientation.w = quaternion[0]
+        imu_msg.orientation.x = quaternion[1]
+        imu_msg.orientation.y = quaternion[2]
+        imu_msg.orientation.z = quaternion[3]
+        self.imu_publisher.publish(imu_msg)
 
     def loop(self):
-
         if self.viewer.is_alive:
             mujoco.mj_step(self.model, self.data)
-
-            # print(self.data.qpos[:])
-
-            self.set_control(0.03, 0.04, 0.03, 0.04)
-
             self.viewer.render()
-
             self.publish_state()
-
         else:
             self.running = False
             self.destroy_node()
@@ -101,7 +84,6 @@ def main():
         pass
     node.destroy_node()
     rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()

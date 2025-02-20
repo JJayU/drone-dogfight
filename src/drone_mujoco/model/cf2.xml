@@ -119,10 +119,10 @@
   </worldbody>
 
   <actuator>
-    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0  0. 1. 0. 0. -0.039" site="motor0"/>
-    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0  0. 1. 0. 0.  0.039" site="motor1"/>
-    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0  0. 1. 0. 0. -0.039" site="motor2"/>
-    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0  0. 1. 0. 0.  0.039" site="motor3"/>
+    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0  0. 0.12 0. 0. -0.005" site="motor0"/>
+    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0  0. 0.12 0. 0.  0.005" site="motor1"/>
+    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0  0. 0.12 0. 0. -0.005" site="motor2"/>
+    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0  0. 0.12 0. 0.  0.005" site="motor3"/>
   </actuator>
 
   <sensor>
@@ -132,6 +132,6 @@
   </sensor>
 
   <keyframe>
-    <key name="hover" qpos="0 0 0.1 1 0 0 0" ctrl="0.26487 0 0 0"/>
+    <key name="hover" qpos="0 0 0.1 1 0 0 0" ctrl="0.06 0.06 0.06 0.06"/>
   </keyframe>
 </mujoco>

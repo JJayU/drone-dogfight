@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'sim = drone_mujoco.sim:main'
+            'sim = drone_mujoco.sim:main',
+            'teleop = drone_mujoco.drone_teleop:main'
         ],
     },
 )
