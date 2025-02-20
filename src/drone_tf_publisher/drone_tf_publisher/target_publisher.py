@@ -2,13 +2,13 @@
 
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Imu
-from geometry_msgs.msg import PointStamped, TransformStamped
-from tf2_ros import TransformBroadcaster
-from tf_transformations import euler_from_quaternion
+from geometry_msgs.msg import PointStamped
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 import math
 
+#
+# Script used for publishing a virtual target point for aiming
+#
 
 class TargetPublisherNode(Node):
     def __init__(self):
@@ -21,47 +21,58 @@ class TargetPublisherNode(Node):
             depth=10
         )
 
-        # Parametry trajektorii
+        # Trajectory params
         self.t = 0.0
-        self.square_size = 0.8  # Rozmiar ruchu w metrach
-        self.z_base = 1.0      # Wysokość podstawowa
-        self.speed = 0.5       # Prędkość ruchu (mniejsza = wolniej)
-        self.segment_time = 4.0 # Czas na jeden segment ruchu
+        self.square_size = 0.8  
+        self.z_base = 1.0      
+        self.speed = 0.5       
+        self.segment_time = 4.0 
 
         self.target_pub = self.create_publisher(PointStamped, '/target_point', qos)
         self.create_timer(0.02, self.loop)
+        
+        self.dynamic_target = False
 
     def calculate_position(self):
-        # Całkowity czas na pełny cykl
-        total_time = self.segment_time * 4  # 4 segmenty ruchu
-        current_t = self.t % total_time
-        segment = int(current_t / self.segment_time)
-        segment_t = (current_t % self.segment_time) / self.segment_time
         
-        # Płynne przejście w ramach segmentu
-        smooth_t = (1 - math.cos(segment_t * math.pi)) / 2
+        if self.dynamic_target:
+            # Dynamic target (square movement)
+            
+            total_time = self.segment_time * 4 
+            current_t = self.t % total_time
+            segment = int(current_t / self.segment_time)
+            segment_t = (current_t % self.segment_time) / self.segment_time
         
-        x = 0.0
-        y = 0.0
-        z = self.z_base
-        
-        # Prosty ruch: góra -> prawo -> dół -> lewo
-        if segment == 0:    # Ruch w górę
+            smooth_t = (1 - math.cos(segment_t * math.pi)) / 2
+            
             x = 0.0
-            y = 1.0
-            z = self.z_base + self.square_size * smooth_t
-        elif segment == 1:  # Ruch w prawo
-            x = self.square_size * smooth_t
-            y = 1.0
-            z = self.z_base + self.square_size
-        elif segment == 2:  # Ruch w dół
-            x = self.square_size
-            y = 1.0
-            z = self.z_base + self.square_size * (1 - smooth_t)
-        else:              # Ruch w lewo
-            x = self.square_size * (1 - smooth_t)
-            y = 1.0
+            y = 0.0
             z = self.z_base
+            
+            # Movement on each side of square
+            if segment == 0:   
+                x = 0.0
+                y = 1.0
+                z = self.z_base + self.square_size * smooth_t
+            elif segment == 1:  
+                x = self.square_size * smooth_t
+                y = 1.0
+                z = self.z_base + self.square_size
+            elif segment == 2:  
+                x = self.square_size
+                y = 1.0
+                z = self.z_base + self.square_size * (1 - smooth_t)
+            else:             
+                x = self.square_size * (1 - smooth_t)
+                y = 1.0
+                z = self.z_base
+        
+        else:
+            # Static target position
+            
+            x = 1.0
+            y = 1.0
+            z = 1.0
             
         return x, y, z
 

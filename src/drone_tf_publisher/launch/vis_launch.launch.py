@@ -1,8 +1,20 @@
 from launch import LaunchDescription
-from launch.actions import TimerAction
+from launch.actions import TimerAction, DeclareLaunchArgument
 from launch_ros.actions import Node
+from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.conditions import IfCondition
+
+#
+# Visualization launch file, used to launch Rviz2, tf_publisher and target_publisher (if not cancelled by setting `publish_target` to False)
+#
 
 def generate_launch_description():
+    
+    publish_target = LaunchConfiguration('publish_target')
+    
+    publish_target_arg = DeclareLaunchArgument(
+        'publish_target', default_value='True', description='Whether to launch target_publisher_node'
+    )
 
     rviz_node = Node(
         package='rviz2',
@@ -21,12 +33,18 @@ def generate_launch_description():
     target_publisher_node = Node(
         package='drone_tf_publisher',
         executable='target_publisher',
-        name='target_publisher'
+        name='target_publisher',
+        condition=IfCondition(
+            PythonExpression([
+                publish_target
+            ]))
     )
 
     ld = LaunchDescription()
     
     ld.add_action(rviz_node)
+    
+    ld.add_action(publish_target_arg)
 
     ld.add_action(TimerAction(
         period=2.0,
