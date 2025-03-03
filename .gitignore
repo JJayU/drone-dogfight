@@ -2,6 +2,7 @@
 build/
 install/
 log/
+.vscode/
 
 # Pliki tymczasowe
 *.pyc
