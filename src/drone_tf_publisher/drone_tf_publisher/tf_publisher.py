@@ -23,6 +23,8 @@ class TFPublisherNode(Node):
 
         self.drone_pos = {'x': 0.0, 'y': 0.0, 'z': 0.0}
         self.current_yaw = 0.0
+        
+        self.quat = [0.,0.,0.,1.]
 
     def gps_callback(self, msg: PointStamped):
         # Update drone position
@@ -35,13 +37,7 @@ class TFPublisherNode(Node):
     def imu_callback(self, msg: Imu):
         # Update drone orientation
         orientation = msg.orientation
-        _, _, yaw = euler_from_quaternion([
-            orientation.x,
-            orientation.y,
-            orientation.z,
-            orientation.w
-        ])
-        self.current_yaw = yaw
+        self.quat = [orientation.x, orientation.y, orientation.z, orientation.w]
 
     def publish_transform(self):
         
@@ -56,11 +52,10 @@ class TFPublisherNode(Node):
         transform.transform.translation.y = self.drone_pos['y']
         transform.transform.translation.z = self.drone_pos['z']
 
-        quaternion = [0.0, 0.0, math.sin(self.current_yaw / 2), math.cos(self.current_yaw / 2)]
-        transform.transform.rotation.x = quaternion[0]
-        transform.transform.rotation.y = quaternion[1]
-        transform.transform.rotation.z = quaternion[2]
-        transform.transform.rotation.w = quaternion[3]
+        transform.transform.rotation.x = self.quat[0]
+        transform.transform.rotation.y = self.quat[1]
+        transform.transform.rotation.z = self.quat[2]
+        transform.transform.rotation.w = self.quat[3]
 
         self.tf_broadcaster.sendTransform(transform)
 
