@@ -64,8 +64,8 @@ class ControlNode(Node):
             10
         )
         
-        self.x_pos_pid = PID(kp=0.8, ki=0.0, kd=1.2, setpoint=1.0, name="X Position")
-        self.y_pos_pid = PID(kp=0.8, ki=0.0, kd=1.2, setpoint=1.0, name="Y Position")
+        self.x_pos_pid = PID(kp=0.8, ki=0.0, kd=1.2, setpoint=0.0, name="X Position")
+        self.y_pos_pid = PID(kp=0.8, ki=0.0, kd=1.2, setpoint=0.0, name="Y Position")
 
         self.roll_pid = PID(kp=3.0, ki=0.01, kd=0.5, setpoint=0.0)
         self.pitch_pid = PID(kp=3.0, ki=0.01, kd=0.5, setpoint=0.0)
