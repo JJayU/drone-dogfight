@@ -4,6 +4,7 @@ from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import Imu
 import numpy as np
+import time
 
 class PID:
     def __init__(self, kp, ki, kd, setpoint, name="unnamed"):
@@ -19,7 +20,7 @@ class PID:
     def update(self, measured_value, dt):
         error = self.setpoint - measured_value
         
-        self.integral = np.clip(self.integral + error * dt, -0.3, 0.3)
+        self.integral = np.clip(self.integral + error * dt, -5, 5)
 
         derivative = (error - self.previous_error) / max(dt, 0.001)
         derivative = 0.8 * self.prev_derivative + 0.2 * derivative
@@ -64,22 +65,26 @@ class ControlNode(Node):
             10
         )
         
-        self.x_pos_pid = PID(kp=0.8, ki=0.0, kd=1.2, setpoint=0.0, name="X Position")
-        self.y_pos_pid = PID(kp=0.8, ki=0.0, kd=1.2, setpoint=0.0, name="Y Position")
+        self.x_pos_pid = PID(kp=0.2, ki=0.0, kd=0.05, setpoint=1, name="X Position")
+        self.y_pos_pid = PID(kp=0.2, ki=0.0, kd=0.05, setpoint=-1, name="Y Position")
 
-        self.roll_pid = PID(kp=3.0, ki=0.01, kd=0.5, setpoint=0.0)
-        self.pitch_pid = PID(kp=3.0, ki=0.01, kd=0.5, setpoint=0.0)
-        self.yaw_pid = PID(kp=1.0, ki=0.1, kd=0.5, setpoint=0.0)
+        self.roll_pid = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0)
+        self.pitch_pid = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0)
+        self.yaw_pid = PID(kp=0.01, ki=0.0, kd=0.01, setpoint=0.0)
 
-        self.height_pid = PID(kp=8.0, ki=0.02, kd=2.0, setpoint=1.0)
+        self.height_pid = PID(kp=1.0, ki=0.5, kd=0.5, setpoint=1.0)
         
         self.dt = 0.005
         self.timer = self.create_timer(self.dt, self.control_update)
+        
+        self.last_time = 0.0
         
     def gps_callback(self, msg):
         self.x = msg.point.x
         self.y = msg.point.y
         self.z = msg.point.z
+        
+        self.last_time = msg.header.stamp.sec + msg.header.stamp.nanosec / 1000000000.
         
     def imu_callback(self, msg):
         q = [
@@ -106,36 +111,50 @@ class ControlNode(Node):
         return roll, pitch, yaw
         
     def control_update(self):
-        desired_pitch = self.x_pos_pid.update(self.x, self.dt)
-        desired_roll = -self.y_pos_pid.update(self.y, self.dt)
+        
+        if(time.time() - self.last_time < 1):
+            
+            desired_x = 1.0
+            desired_y = 0.0
+            
+            dx = (self.x - desired_x) * np.cos(-self.yaw) + np.sin(-self.yaw) * (self.y - desired_y)
+            dy = (self.y - desired_y) * np.cos(-self.yaw) + np.sin(-self.yaw) * (self.x - desired_x)
+            
+            # print(dx)
+        
+            desired_pitch = self.x_pos_pid.update(self.x, self.dt)
+            desired_roll = self.y_pos_pid.update(self.y, self.dt)
 
-        desired_pitch = np.clip(desired_pitch, -0.15, 0.15) 
-        desired_roll = np.clip(desired_roll, -0.15, 0.15) 
-        
-        self.pitch_pid.setpoint = desired_pitch
-        self.roll_pid.setpoint = desired_roll
-        
-        height_control = self.height_pid.update(self.z, self.dt)
-        pitch_control = self.pitch_pid.update(self.pitch, self.dt)
-        roll_control = self.roll_pid.update(self.roll, self.dt)
-        yaw_control = self.yaw_pid.update(self.yaw, self.dt)
-        
-        base = 2
-        m1 = base + height_control - pitch_control + roll_control - yaw_control
-        m2 = base + height_control - pitch_control - roll_control + yaw_control
-        m3 = base + height_control + pitch_control - roll_control - yaw_control
-        m4 = base + height_control + pitch_control + roll_control + yaw_control
-        
-        max_thrust = max(abs(m1), abs(m2), abs(m3), abs(m4))
-        if max_thrust > 1.0:
-            m1 /= max_thrust
-            m2 /= max_thrust
-            m3 /= max_thrust
-            m4 /= max_thrust
-        
-        motor_commands = Float32MultiArray()
-        motor_commands.data = [float(m1), float(m2), float(m3), float(m4)]
-        self.motor_pub.publish(motor_commands)
+            desired_pitch = np.clip(desired_pitch, -0.15, 0.15) 
+            desired_roll = np.clip(desired_roll, -0.15, 0.15) 
+            
+            self.pitch_pid.setpoint = desired_pitch * np.cos(self.yaw) - desired_roll * np.sin(-self.yaw)
+            self.roll_pid.setpoint = - desired_roll * np.cos(-self.yaw) + desired_pitch * np.sin(self.yaw)
+            self.yaw_pid.setpoint = 0.
+            
+            height_control = self.height_pid.update(self.z, self.dt)
+            pitch_control = self.pitch_pid.update(self.pitch, self.dt)
+            roll_control = self.roll_pid.update(self.roll, self.dt)
+            yaw_control = self.yaw_pid.update(self.yaw, self.dt)
+            
+            print(self.height_pid.integral)
+            
+            base = 2
+            m1 = height_control - pitch_control + roll_control - yaw_control
+            m2 = height_control - pitch_control - roll_control + yaw_control
+            m3 = height_control + pitch_control - roll_control - yaw_control
+            m4 = height_control + pitch_control + roll_control + yaw_control
+            
+            max_thrust = max(abs(m1), abs(m2), abs(m3), abs(m4))
+            if max_thrust > 1.0:
+                m1 /= max_thrust
+                m2 /= max_thrust
+                m3 /= max_thrust
+                m4 /= max_thrust
+            
+            motor_commands = Float32MultiArray()
+            motor_commands.data = [float(m1), float(m2), float(m3), float(m4)]
+            self.motor_pub.publish(motor_commands)
         
 def main():
     rclpy.init()
