@@ -41,8 +41,8 @@ class ControlNode(Node):
         self.x = 0.0
         self.y = 0.0
         self.z = 0.0
-        self.roll = 0.0
         self.pitch = 0.0
+        self.roll = 0.0
         self.yaw = 0.0
         
         self.gps_sub = self.create_subscription(
@@ -88,43 +88,43 @@ class ControlNode(Node):
             msg.orientation.y,
             msg.orientation.z
         ]
-        self.roll, self.pitch, self.yaw = self.quaternion_to_euler(q)
+        self.pitch, self.roll, self.yaw = self.quaternion_to_euler(q)
         
     def quaternion_to_euler(self, q):
         w, x, y, z = q
         sinr_cosp = 2 * (w * x + y * z)
         cosr_cosp = 1 - 2 * (x * x + y * y)
-        roll = np.arctan2(sinr_cosp, cosr_cosp)
+        pitch = np.arctan2(sinr_cosp, cosr_cosp)
         
         sinp = 2 * (w * y - z * x)
-        pitch = np.arcsin(sinp)
+        roll = np.arcsin(sinp)
         
         siny_cosp = 2 * (w * z + x * y)
         cosy_cosp = 1 - 2 * (y * y + z * z)
         yaw = np.arctan2(siny_cosp, cosy_cosp)
         
-        return roll, pitch, yaw
+        return pitch, roll, yaw
         
     def control_update(self):
-        desired_pitch = self.x_pos_pid.update(self.x, self.dt)
-        desired_roll = -self.y_pos_pid.update(self.y, self.dt)
+        desired_roll = self.x_pos_pid.update(self.x, self.dt)
+        desired_pitch = -self.y_pos_pid.update(self.y, self.dt)
 
-        desired_pitch = np.clip(desired_pitch, -0.15, 0.15) 
         desired_roll = np.clip(desired_roll, -0.15, 0.15) 
+        desired_pitch = np.clip(desired_pitch, -0.15, 0.15) 
         
-        self.pitch_pid.setpoint = desired_pitch
         self.roll_pid.setpoint = desired_roll
+        self.pitch_pid.setpoint = desired_pitch
         
         height_control = self.height_pid.update(self.z, self.dt)
-        pitch_control = self.pitch_pid.update(self.pitch, self.dt)
         roll_control = self.roll_pid.update(self.roll, self.dt)
+        pitch_control = self.pitch_pid.update(self.pitch, self.dt)
         yaw_control = self.yaw_pid.update(self.yaw, self.dt)
         
         base = 2
-        m1 = base + height_control - pitch_control + roll_control - yaw_control
-        m2 = base + height_control - pitch_control - roll_control + yaw_control
-        m3 = base + height_control + pitch_control - roll_control - yaw_control
-        m4 = base + height_control + pitch_control + roll_control + yaw_control
+        m1 = base + height_control - roll_control + pitch_control - yaw_control
+        m2 = base + height_control - roll_control - pitch_control + yaw_control
+        m3 = base + height_control + roll_control - pitch_control - yaw_control
+        m4 = base + height_control + roll_control + pitch_control + yaw_control
         
         max_thrust = max(abs(m1), abs(m2), abs(m3), abs(m4))
         if max_thrust > 1.0:
