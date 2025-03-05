@@ -65,19 +65,21 @@ class ControlNode(Node):
             10
         )
         
-        self.x_pos_pid = PID(kp=0.2, ki=0.0, kd=0.05, setpoint=1, name="X Position")
-        self.y_pos_pid = PID(kp=0.2, ki=0.0, kd=0.05, setpoint=-1, name="Y Position")
+        self.x_pos_pid  = PID(kp=0.20, ki=0.0, kd=0.05, setpoint=0.0, name="X Position")
+        self.y_pos_pid  = PID(kp=0.20, ki=0.0, kd=0.05, setpoint=0.0, name="Y Position")
 
-        self.roll_pid = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0)
-        self.pitch_pid = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0)
-        self.yaw_pid = PID(kp=0.01, ki=0.0, kd=0.01, setpoint=0.0)
+        self.roll_pid   = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0)
+        self.pitch_pid  = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0)
+        self.yaw_pid    = PID(kp=0.01, ki=0.0, kd=0.01, setpoint=0.0)
 
-        self.height_pid = PID(kp=1.0, ki=0.5, kd=0.5, setpoint=1.0)
+        self.height_pid = PID(kp=1.00, ki=0.5, kd=0.50, setpoint=1.0)
         
         self.dt = 0.005
         self.timer = self.create_timer(self.dt, self.control_update)
         
         self.last_time = 0.0
+        
+        self.angle = 0.
         
     def gps_callback(self, msg):
         self.x = msg.point.x
@@ -114,13 +116,17 @@ class ControlNode(Node):
         
         if(time.time() - self.last_time < 1):
             
-            desired_x = 1.0
-            desired_y = 0.0
+            self.angle += 0.0005
             
-            dx = (self.x - desired_x) * np.cos(-self.yaw) + np.sin(-self.yaw) * (self.y - desired_y)
-            dy = (self.y - desired_y) * np.cos(-self.yaw) + np.sin(-self.yaw) * (self.x - desired_x)
+            target_x = np.sin(self.angle)
+            target_y = np.cos(self.angle)
             
-            # print(dx)
+            self.x_pos_pid.setpoint = target_x + 1
+            self.y_pos_pid.setpoint = target_y + 1
+            
+            target_yaw = np.arctan2(1 - self.y, 1 - self.x)
+            
+            print(f"{target_x} {target_y} {target_yaw}")
         
             desired_pitch = self.x_pos_pid.update(self.x, self.dt)
             desired_roll = self.y_pos_pid.update(self.y, self.dt)
@@ -130,16 +136,13 @@ class ControlNode(Node):
             
             self.pitch_pid.setpoint = desired_pitch * np.cos(self.yaw) - desired_roll * np.sin(-self.yaw)
             self.roll_pid.setpoint = - desired_roll * np.cos(-self.yaw) + desired_pitch * np.sin(self.yaw)
-            self.yaw_pid.setpoint = 0.
+            self.yaw_pid.setpoint = target_yaw
             
             height_control = self.height_pid.update(self.z, self.dt)
             pitch_control = self.pitch_pid.update(self.pitch, self.dt)
             roll_control = self.roll_pid.update(self.roll, self.dt)
             yaw_control = self.yaw_pid.update(self.yaw, self.dt)
             
-            print(self.height_pid.integral)
-            
-            base = 2
             m1 = height_control - pitch_control + roll_control - yaw_control
             m2 = height_control - pitch_control - roll_control + yaw_control
             m3 = height_control + pitch_control - roll_control - yaw_control
