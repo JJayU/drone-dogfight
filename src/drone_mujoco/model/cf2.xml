@@ -1,5 +1,5 @@
 <mujoco model="cf2">
-  <option integrator="RK4" density="1.225" viscosity="1.8e-5"/>
+  <option integrator="RK4" density="1.225" viscosity="1.8e-5" timestep="0.005"/>
 
   <compiler inertiafromgeom="false" meshdir="assets" autolimits="true"/>
 
@@ -132,6 +132,6 @@
   </sensor>
 
   <keyframe>
-    <key name="hover" qpos="0 0 0.1 1 0 0 0" ctrl="0.06 0.06 0.06 0.06"/>
+    <key name="hover" qpos="0 0 0.5 1 0 0 0" ctrl="0.06 0.06 0.06 0.06"/>
   </keyframe>
 </mujoco>
