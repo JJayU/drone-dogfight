@@ -18,7 +18,11 @@ class PID:
         self.prev_derivative = 0
         
     def update(self, measured_value, dt):
-        error = self.setpoint - measured_value
+        
+        if self.name == "yaw":
+            error = np.arctan2(np.sin(self.setpoint - measured_value), np.cos(self.setpoint - measured_value))
+        else:
+            error = self.setpoint - measured_value
         
         self.integral = np.clip(self.integral + error * dt, -5, 5)
 
@@ -70,7 +74,7 @@ class ControlNode(Node):
 
         self.roll_pid   = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0)
         self.pitch_pid  = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0)
-        self.yaw_pid    = PID(kp=0.01, ki=0.0, kd=0.01, setpoint=0.0)
+        self.yaw_pid    = PID(kp=0.01, ki=0.0, kd=0.01, setpoint=0.0, name="yaw")
 
         self.height_pid = PID(kp=1.00, ki=0.5, kd=0.50, setpoint=1.0)
         
@@ -116,7 +120,7 @@ class ControlNode(Node):
         
         if(time.time() - self.last_time < 1):
             
-            self.angle += 0.0005
+            self.angle += 0.001
             
             target_x = np.sin(self.angle)
             target_y = np.cos(self.angle)
@@ -131,8 +135,8 @@ class ControlNode(Node):
             desired_pitch = self.x_pos_pid.update(self.x, self.dt)
             desired_roll = self.y_pos_pid.update(self.y, self.dt)
 
-            desired_pitch = np.clip(desired_pitch, -0.15, 0.15) 
-            desired_roll = np.clip(desired_roll, -0.15, 0.15) 
+            desired_pitch = np.clip(desired_pitch, -0.3, 0.3) 
+            desired_roll = np.clip(desired_roll, -0.3, 0.3) 
             
             self.pitch_pid.setpoint = desired_pitch * np.cos(self.yaw) - desired_roll * np.sin(-self.yaw)
             self.roll_pid.setpoint = - desired_roll * np.cos(-self.yaw) + desired_pitch * np.sin(self.yaw)
