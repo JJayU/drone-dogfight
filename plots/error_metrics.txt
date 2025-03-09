@@ -1,0 +1,28 @@
+Mean Squared Errors:
+x: 0.617246
+y: 0.360342
+z: 0.960640
+roll: 8.914195
+pitch: 0.002355
+yaw: 2.017521
+
+Best Parameters:
+kp_x: 0.521558
+ki_x: 0.086138
+kd_x: 0.252982
+kp_y: 0.662796
+ki_y: 0.088061
+kd_y: 0.375998
+kp_z: 1.704485
+ki_z: 0.389549
+kd_z: 0.908491
+kp_roll: 0.220546
+ki_roll: 0.037910
+kd_roll: 0.023825
+kp_pitch: 0.092955
+ki_pitch: 0.031571
+kd_pitch: 0.030294
+kp_yaw: 0.044144
+ki_yaw: 0.018837
+kd_yaw: 0.029852
+d_filter: 0.682045

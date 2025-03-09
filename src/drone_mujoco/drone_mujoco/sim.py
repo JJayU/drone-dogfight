@@ -8,6 +8,7 @@ from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import Imu
 from ament_index_python.packages import get_package_share_directory
 import time
+from std_srvs.srv import Empty
 
 class SimNode(Node):
     def __init__(self, use_gui=False):
@@ -41,6 +42,7 @@ class SimNode(Node):
 
         self.gps_publisher = self.create_publisher(PointStamped, 'gps', 10)
         self.imu_publisher = self.create_publisher(Imu, 'imu', 10)
+        self.reset_service = self.create_service(Empty, 'reset_simulation', self.reset_callback)
 
     def motor_listener_callback(self, msg):
         if len(msg.data) == 4:
@@ -51,7 +53,14 @@ class SimNode(Node):
     def set_control(self, motor_commands):
         for i in range(4):
             self.data.ctrl[i] = np.clip(motor_commands[i], 0, 1)
-
+            
+    def reset_callback(self, request, response):
+        # Resetuj stan symulacji
+        self.data.qpos[0:3] = [0.0, 0.0, 0.5]  # Pozycja startowa
+        self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]  # Orientacja startowa (brak rotacji)
+        self.data.qvel[:] = 0.0  # Zeruj prędkości
+        self.get_logger().info("Simulation reset!")
+        return response
     def publish_state(self):
         x, y, z = self.data.qpos[0:3]
 

@@ -27,7 +27,7 @@ class PID:
         self.integral = np.clip(self.integral + error * dt, -5, 5)
 
         derivative = (error - self.previous_error) / max(dt, 0.001)
-        derivative = 0.8 * self.prev_derivative + 0.2 * derivative
+        derivative = 0.682045 * self.prev_derivative + (1-0.682045) * derivative
         self.prev_derivative = derivative
         
         p_term = self.kp * error
@@ -69,14 +69,15 @@ class ControlNode(Node):
             10
         )
         
-        self.x_pos_pid  = PID(kp=0.20, ki=0.0, kd=0.05, setpoint=0.0, name="X Position")
-        self.y_pos_pid  = PID(kp=0.20, ki=0.0, kd=0.05, setpoint=0.0, name="Y Position")
+        self.x_pos_pid  = PID(kp=0.521558, ki=0.086138, kd=0.252982, setpoint=0.0, name="X Position")
+        self.y_pos_pid  = PID(kp=0.662796, ki=0.088061, kd=0.375998, setpoint=0.0, name="Y Position")
 
-        self.roll_pid   = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0)
-        self.pitch_pid  = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0)
-        self.yaw_pid    = PID(kp=0.01, ki=0.0, kd=0.01, setpoint=0.0, name="yaw")
+        self.roll_pid   = PID(kp=0.220546, ki=0.037910, kd=0.023825, setpoint=0.0, name="Roll")
+        self.pitch_pid  = PID(kp=0.092955, ki=0.031571, kd=0.030294, setpoint=0.0, name="Pitch")
+        self.yaw_pid    = PID(kp=0.044144, ki=0.018837, kd=0.029852, setpoint=0.0, name="yaw")
 
-        self.height_pid = PID(kp=1.00, ki=0.5, kd=0.50, setpoint=1.0)
+        self.height_pid = PID(kp=1.704485, ki=0.389549, kd=0.908491, setpoint=1.0, name="Height")
+
         
         self.dt = 0.005
         self.timer = self.create_timer(self.dt, self.control_update)
