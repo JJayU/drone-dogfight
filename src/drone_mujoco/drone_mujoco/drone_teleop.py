@@ -62,6 +62,12 @@ class ControlNode(Node):
             self.imu_callback,
             10
         )
+        self.target_sub = self.create_subscription(
+            PointStamped,
+            'target_point',
+            self.target_callback,
+            10
+        )
         
         self.motor_pub = self.create_publisher(
             Float32MultiArray,
@@ -83,6 +89,8 @@ class ControlNode(Node):
         
         self.last_time = 0.0
         
+        self.target = [0., 0., 0.]
+        
         self.angle = 0.
         
     def gps_callback(self, msg):
@@ -100,6 +108,9 @@ class ControlNode(Node):
             msg.orientation.z
         ]
         self.roll, self.pitch, self.yaw = self.quaternion_to_euler(q)
+        
+    def target_callback(self, msg):
+        self.target = [msg.point.x, msg.point.y, msg.point.z]
         
     def quaternion_to_euler(self, q):
         w, x, y, z = q
@@ -125,10 +136,12 @@ class ControlNode(Node):
             target_x = np.sin(self.angle)
             target_y = np.cos(self.angle)
             
-            self.x_pos_pid.setpoint = target_x + 1
-            self.y_pos_pid.setpoint = target_y + 1
+            self.x_pos_pid.setpoint = target_x
+            self.y_pos_pid.setpoint = target_y
             
-            target_yaw = np.arctan2(1 - self.y, 1 - self.x)
+            target_yaw = np.arctan2(self.target[1] - self.y, self.target[0] - self.x)
+            
+            self.height_pid.setpoint = self.target[2]
             
             print(f"{target_x} {target_y} {target_yaw}")
         
