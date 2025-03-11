@@ -30,14 +30,6 @@ class PIDTuner(Node):
         self.yaw = 0.0
         self.last_time = 0.0
         
-        # Position and orientation history for visualization
-        self.history = {
-            'time': [],
-            'x': [], 'y': [], 'z': [],
-            'roll': [], 'pitch': [], 'yaw': [],
-            'target_x': [], 'target_y': [], 'target_z': []
-        }
-        
         # Subscriptions
         self.gps_sub = self.create_subscription(PointStamped, 'gps', self.gps_callback, 10)
         self.imu_sub = self.create_subscription(Imu, 'imu', self.imu_callback, 10)
@@ -57,225 +49,69 @@ class PIDTuner(Node):
         self.error_samples = {}
         self.optimization_complete = threading.Event()
         
+        # For tracking optimization progress
+        self.best_values = []
+        self.iteration_numbers = []
+        
         # Control timer
         self.control_timer = self.create_timer(
             0.005, self.control_callback, callback_group=self.timer_callback_group)
         self.control_timer.cancel()
         
+        # Create plots directory
+        os.makedirs('/home/ws/plots', exist_ok=True)
+        
         # Start optimization in separate thread
         self.optimization_thread = threading.Thread(target=self.run_optimization)
         self.optimization_thread.start()
         
-        # Create plots directory
-        os.makedirs('/home/ws/plots', exist_ok=True)
-        
     def run_optimization(self):
         self.study = optuna.create_study(direction='minimize')
-        self.study.optimize(self.objective, n_trials=500)  # Reduced for development, increase for production
+        
+        # Set up callback to track best values
+        def track_best_value(study, trial):
+            self.best_values.append(study.best_value)
+            self.iteration_numbers.append(len(study.trials))
+            
+        self.study.optimize(self.objective, n_trials=5, callbacks=[track_best_value])
         
         self.best_params = self.study.best_params
         self.get_logger().info(f"Best parameters: {self.best_params}")
         
-        # Run one final time with best parameters and save plots
-        self.visualize_best_params()
+        # Generate and save cost vs iterations plot
+        self.plot_cost_vs_iterations()
         
-    def visualize_best_params(self):
-        """Run a final trial with best parameters and generate plots"""
-        reset_future = self.reset_simulation()
-        while not reset_future.done():
-            time.sleep(0.01)
-        
-        time.sleep(0.5)
-        
-        # Clear history and ensure synchronization
-        self.history_lock = threading.Lock()
-        for key in self.history:
-            self.history[key] = []
-            
-        # Reset error samples
-        self.error_samples = {
-            "x": [], "y": [], "z": [],
-            "roll": [], "pitch": [], "yaw": []
-        }
-        
-        # Set targets
-        self.target_x = 1.0
-        self.target_y = 1.0
-        self.target_z = 1.0
-        self.target_yaw = 0.7
-        
-        # Initialize PIDs with best parameters
-        d_filter = self.best_params.get('d_filter', 0.8)
-        
-        self.x_pos_pid = PID(self.best_params['kp_x'], self.best_params['ki_x'], 
-                           self.best_params['kd_x'], setpoint=self.target_x, name="X Position", d_filter=d_filter)
-        self.y_pos_pid = PID(self.best_params['kp_y'], self.best_params['ki_y'], 
-                           self.best_params['kd_y'], setpoint=self.target_y, name="Y Position", d_filter=d_filter)
-        self.height_pid = PID(self.best_params['kp_z'], self.best_params['ki_z'], 
-                           self.best_params['kd_z'], setpoint=self.target_z, name="Height", d_filter=d_filter)
-        
-        self.roll_pid = PID(self.best_params['kp_roll'], self.best_params['ki_roll'], 
-                          self.best_params['kd_roll'], setpoint=0.0, name="Roll", d_filter=d_filter)
-        self.pitch_pid = PID(self.best_params['kp_pitch'], self.best_params['ki_pitch'], 
-                           self.best_params['kd_pitch'], setpoint=0.0, name="Pitch", d_filter=d_filter)
-        self.yaw_pid = PID(self.best_params['kp_yaw'], self.best_params['ki_yaw'], 
-                         self.best_params['kd_yaw'], setpoint=self.target_yaw, name="yaw", d_filter=d_filter)
-        
-        # Run visualization trial
-        self.timer_counter = 0
-        self.recording_data = True
-        self.data_complete = threading.Event()
-        self.control_timer = self.create_timer(
-            0.005, self.control_callback, callback_group=self.timer_callback_group)
-        
-        # Wait for completion
-        end_time = time.time() + self.max_iterations * 0.005 + 1.0
-        while time.time() < end_time:
-            if self.timer_counter >= self.max_iterations:
-                break
-            time.sleep(0.1)
-            
-        self.control_timer.cancel()
-        self.recording_data = False
-        time.sleep(0.2)  # Allow final callbacks to complete
-        
-        # Generate and save plots
-        self.generate_plots()
-        
-    def generate_plots(self):
-        # Create plots directory
+    def plot_cost_vs_iterations(self):
+        """Generate and save a plot of minimum cost value vs number of iterations"""
         plots_dir = '/home/ws/plots'
         os.makedirs(plots_dir, exist_ok=True)
         
-        # Ensure all arrays have the same length
-        min_length = min(len(self.history['time']), 
-                         len(self.history['x']), 
-                         len(self.history['y']), 
-                         len(self.history['z']))
-        
-        # Truncate all arrays to the same length
-        time_values = np.array(self.history['time'][:min_length])
-        x_values = np.array(self.history['x'][:min_length])
-        y_values = np.array(self.history['y'][:min_length])
-        z_values = np.array(self.history['z'][:min_length])
-        
-        # Ensure orientation arrays have the same length
-        min_orient_length = min(min_length, 
-                              len(self.history['roll']), 
-                              len(self.history['pitch']), 
-                              len(self.history['yaw']))
-        roll_values = np.array(self.history['roll'][:min_orient_length])
-        pitch_values = np.array(self.history['pitch'][:min_orient_length])
-        yaw_values = np.array(self.history['yaw'][:min_orient_length])
-        time_for_orient = time_values[:min_orient_length]
-        
-        # Error arrays should already be synchronized from control_callback
-        errors_x = np.array(self.error_samples['x'])
-        errors_y = np.array(self.error_samples['y'])
-        errors_z = np.array(self.error_samples['z'])
-        error_time = np.arange(len(errors_x)) * 0.005
-        
-        self.get_logger().info(f"Plotting data: time={len(time_values)}, x={len(x_values)}, y={len(y_values)}, z={len(z_values)}")
-        
-        # Normalize time relative to start
-        if len(time_values) > 0:
-            time_values = time_values - time_values[0]
-            if len(time_for_orient) > 0:
-                time_for_orient = time_for_orient - time_for_orient[0]
-        
-        # Position trajectory plot
-        plt.figure(figsize=(12, 8))
-        
-        # 3D trajectory
-        ax1 = plt.subplot(221, projection='3d')
-        if min_length > 0:
-            ax1.plot(x_values, y_values, z_values, 'b-', label='Actual')
-            ax1.plot([self.target_x], [self.target_y], [self.target_z], 'ro', label='Target')
-            ax1.set_xlabel('X Position')
-            ax1.set_ylabel('Y Position')
-            ax1.set_zlabel('Z Position')
-            ax1.set_title('3D Trajectory')
-            ax1.legend()
-        else:
-            ax1.text(0.5, 0.5, 0.5, "Insufficient data", ha='center')
-        
-        # Position over time
-        ax2 = plt.subplot(222)
-        if min_length > 0:
-            ax2.plot(time_values, x_values, 'r-', label='X')
-            ax2.plot(time_values, y_values, 'g-', label='Y')
-            ax2.plot(time_values, z_values, 'b-', label='Z')
-            ax2.axhline(y=self.target_x, color='r', linestyle='--')
-            ax2.axhline(y=self.target_y, color='g', linestyle='--')
-            ax2.axhline(y=self.target_z, color='b', linestyle='--')
-            ax2.set_xlabel('Time (s)')
-            ax2.set_ylabel('Position')
-            ax2.set_title('Position over Time')
-            ax2.legend()
-        else:
-            ax2.text(0.5, 0.5, "Insufficient data", ha='center')
-        
-        # Orientation over time
-        ax3 = plt.subplot(223)
-        if min_orient_length > 0:
-            ax3.plot(time_for_orient, np.rad2deg(roll_values), 'r-', label='Roll')
-            ax3.plot(time_for_orient, np.rad2deg(pitch_values), 'g-', label='Pitch')
-            ax3.plot(time_for_orient, np.rad2deg(yaw_values), 'b-', label='Yaw')
-            ax3.set_xlabel('Time (s)')
-            ax3.set_ylabel('Angle (degrees)')
-            ax3.set_title('Orientation over Time')
-            ax3.legend()
-        else:
-            ax3.text(0.5, 0.5, "Insufficient orientation data", ha='center')
-        
-        # Errors over time
-        ax4 = plt.subplot(224)
-        if len(errors_x) > 0:
-            ax4.plot(error_time, errors_x, 'r-', label='X error')
-            ax4.plot(error_time, errors_y, 'g-', label='Y error')
-            ax4.plot(error_time, errors_z, 'b-', label='Z error')
-            ax4.set_xlabel('Time (s)')
-            ax4.set_ylabel('Error')
-            ax4.set_title('Position Errors over Time')
-            ax4.legend()
-        else:
-            ax4.text(0.5, 0.5, "No error data collected", ha='center')
-        
+        plt.figure(figsize=(10, 6))
+        plt.plot(self.iteration_numbers, self.best_values, 'b-', linewidth=2)
+        plt.xlabel('Number of Iterations')
+        plt.ylabel('Minimum Cost Function Value')
+        plt.title('Optimization Progress: Minimum Cost vs Iterations')
+        plt.grid(True)
         plt.tight_layout()
-        plt.savefig(f'{plots_dir}/trajectory_and_errors.png')
         
-        # Save 2D trajectory (top view)
-        plt.figure(figsize=(10, 8))
-        if min_length > 0:
-            plt.plot(x_values, y_values, 'b-', label='Drone Path')
-            plt.plot(self.target_x, self.target_y, 'ro', label='Target Position')
-            plt.xlabel('X Position')
-            plt.ylabel('Y Position')
-            plt.title('Drone Trajectory (Top View)')
-            plt.grid(True)
-            plt.axis('equal')
-            plt.legend()
-        else:
-            plt.text(0.5, 0.5, "Insufficient data for 2D trajectory", ha='center')
-        plt.savefig(f'{plots_dir}/2d_trajectory.png')
-                
-        # Save error metrics
-        mse_errors = {}
-        for key, samples in self.error_samples.items():
-            if samples:
-                mse_errors[key] = np.mean(np.square(samples))
-            else:
-                mse_errors[key] = float('inf')
-                
-        with open(f'{plots_dir}/error_metrics.txt', 'w') as f:
-            f.write("Mean Squared Errors:\n")
-            for key, value in mse_errors.items():
-                f.write(f"{key}: {value:.6f}\n")
-            f.write("\nBest Parameters:\n")
+        # Save the plot
+        plt.savefig(f'{plots_dir}/cost_vs_iterations.png')
+        
+        # Save the data as CSV
+        with open(f'{plots_dir}/cost_data.csv', 'w') as f:
+            f.write("iteration,min_cost\n")
+            for iter_num, cost in zip(self.iteration_numbers, self.best_values):
+                f.write(f"{iter_num},{cost}\n")
+        
+        self.get_logger().info(f"Cost vs iterations plot saved to {plots_dir}")
+        
+        # Save best parameters to file
+        with open(f'{plots_dir}/best_parameters.txt', 'w') as f:
+            f.write("Best Parameters:\n")
             for key, value in self.best_params.items():
                 f.write(f"{key}: {value:.6f}\n")
-                
-        self.get_logger().info(f"Plots and error metrics saved to {plots_dir}")
+            f.write(f"\nBest cost value: {self.study.best_value:.6f}\n")
+            f.write(f"Total number of trials: {len(self.study.trials)}\n")
         
     def reset_simulation(self):
         request = Empty.Request()
@@ -287,25 +123,9 @@ class PIDTuner(Node):
         self.z = msg.point.z
         self.last_time = msg.header.stamp.sec + msg.header.stamp.nanosec / 1000000000.
         
-        # Record history if in visualization mode
-        if hasattr(self, 'recording_data') and self.recording_data:
-            self.history['time'].append(self.last_time)
-            self.history['x'].append(self.x)
-            self.history['y'].append(self.y)
-            self.history['z'].append(self.z)
-            self.history['target_x'].append(self.target_x)
-            self.history['target_y'].append(self.target_y)
-            self.history['target_z'].append(self.target_z)
-        
     def imu_callback(self, msg):
         q = [msg.orientation.w, msg.orientation.x, msg.orientation.y, msg.orientation.z]
         self.roll, self.pitch, self.yaw = self.quaternion_to_euler(q)
-        
-        # Record history if in visualization mode
-        if hasattr(self, 'recording_data') and self.recording_data:
-            self.history['roll'].append(self.roll)
-            self.history['pitch'].append(self.pitch)
-            self.history['yaw'].append(self.yaw)
         
     def quaternion_to_euler(self, q):
         w, x, y, z = q
@@ -340,7 +160,7 @@ class PIDTuner(Node):
         self.target_x = 1.0
         self.target_y = 1.0
         self.target_z = 1.0
-        self.target_yaw = 0.0
+        self.target_yaw = 0.7
 
         # PID parameters with expanded ranges
         kp_x = trial.suggest_float('kp_x', 0.05, 1.0)
