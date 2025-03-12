@@ -97,7 +97,7 @@ class ControlNode(Node):
         self.y_pos_pid  = PID(kp=0.662796, ki=0.088061, kd=0.375998, setpoint=0.0, name="Y Position")
 
         self.roll_pid   = PID(kp=0.220546, ki=0.037910, kd=0.023825, setpoint=0.0, name="Roll")
-        self.pitch_pid  = PID(kp=0.092955, ki=0.031571, kd=0.030294, setpoint=0.0, name="Pitch")
+        self.pitch_pid  = PID(kp=0.220546, ki=0.037910, kd=0.023825, setpoint=0.0, name="Pitch")
         self.yaw_pid    = PID(kp=0.044144, ki=0.018837, kd=0.029852, setpoint=0.0, name="yaw")
 
         self.height_pid = PID(kp=1.704485, ki=0.389549, kd=0.908491, setpoint=1.0, name="Height")
