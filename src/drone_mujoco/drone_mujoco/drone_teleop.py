@@ -19,7 +19,7 @@ class PID:
         
     def update(self, measured_value, dt):
         
-        if self.name == "yaw":
+        if self.name == "Yaw":
             error = np.arctan2(np.sin(self.setpoint - measured_value), np.cos(self.setpoint - measured_value))
         else:
             error = self.setpoint - measured_value
@@ -75,14 +75,25 @@ class ControlNode(Node):
             10
         )
         
-        self.x_pos_pid  = PID(kp=0.20, ki=0.0, kd=0.05, setpoint=0.0, name="X Position")
-        self.y_pos_pid  = PID(kp=0.20, ki=0.0, kd=0.05, setpoint=0.0, name="Y Position")
+        # More conservative but steadier
+        # self.x_pos_pid  = PID(kp=0.20, ki=0.0, kd=0.05, setpoint=0.0, name="X Position")
+        # self.y_pos_pid  = PID(kp=0.20, ki=0.0, kd=0.05, setpoint=0.0, name="Y Position")
 
-        self.roll_pid   = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0)
-        self.pitch_pid  = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0)
-        self.yaw_pid    = PID(kp=0.01, ki=0.0, kd=0.01, setpoint=0.0, name="yaw")
+        # self.roll_pid   = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0, name="Roll")
+        # self.pitch_pid  = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0, name="Pitch")
+        # self.yaw_pid    = PID(kp=0.01, ki=0.0, kd=0.01, setpoint=0.0, name="Yaw")
 
-        self.height_pid = PID(kp=1.00, ki=0.5, kd=0.50, setpoint=1.0)
+        # self.height_pid = PID(kp=1.00, ki=0.5, kd=0.50, setpoint=1.0, name="Height")
+        
+        # More aggresive but a little bit unstable
+        self.x_pos_pid  = PID(kp=0.521558, ki=0.086138, kd=0.252982, setpoint=0.0, name="X Position")
+        self.y_pos_pid  = PID(kp=0.662796, ki=0.088061, kd=0.375998, setpoint=0.0, name="Y Position")
+
+        self.roll_pid   = PID(kp=0.220546, ki=0.037910, kd=0.023825, setpoint=0.0, name="Roll")
+        self.pitch_pid  = PID(kp=0.220546, ki=0.037910, kd=0.023825, setpoint=0.0, name="Pitch")
+        self.yaw_pid    = PID(kp=0.044144, ki=0.018837, kd=0.029852, setpoint=0.0, name="Yaw")
+
+        self.height_pid = PID(kp=1.704485, ki=0.5, kd=1.208491, setpoint=1.0, name="Height")
         
         self.dt = 0.005
         self.timer = self.create_timer(self.dt, self.control_update)
@@ -137,19 +148,17 @@ class ControlNode(Node):
             target_y = np.cos(self.angle)
             
             self.x_pos_pid.setpoint = target_x
-            self.y_pos_pid.setpoint = target_y
+            self.y_pos_pid.setpoint = target_y 
             
             target_yaw = np.arctan2(self.target[1] - self.y, self.target[0] - self.x)
             
-            self.height_pid.setpoint = self.target[2]
-            
-            print(f"{target_x} {target_y} {target_yaw}")
+            self.height_pid.setpoint = self.target[2] - 0.02
         
             desired_pitch = self.x_pos_pid.update(self.x, self.dt)
             desired_roll = self.y_pos_pid.update(self.y, self.dt)
 
-            desired_pitch = np.clip(desired_pitch, -0.3, 0.3) 
-            desired_roll = np.clip(desired_roll, -0.3, 0.3) 
+            desired_pitch = np.clip(desired_pitch, -0.5, 0.5) 
+            desired_roll = np.clip(desired_roll, -0.5, 0.5) 
             
             self.pitch_pid.setpoint = desired_pitch * np.cos(self.yaw) - desired_roll * np.sin(-self.yaw)
             self.roll_pid.setpoint = - desired_roll * np.cos(-self.yaw) + desired_pitch * np.sin(self.yaw)
