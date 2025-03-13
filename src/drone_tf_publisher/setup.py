@@ -20,7 +20,6 @@ setup(
     maintainer_email='jakub.junkiert@gmail.com',
     description='TODO: Package description',
     license='TODO: License declaration',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'tf_publisher = drone_tf_publisher.tf_publisher:main',
