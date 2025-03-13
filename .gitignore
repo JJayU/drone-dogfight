@@ -7,3 +7,4 @@ log/
 # Pliki tymczasowe
 *.pyc
 __pycache__/
+src/crazyswarm2
