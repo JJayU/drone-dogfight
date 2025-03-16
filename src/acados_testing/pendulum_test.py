@@ -77,11 +77,8 @@ def main():
 
     # set options
     ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
-    # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_QPOASES, FULL_CONDENSING_HPIPM,
-    # PARTIAL_CONDENSING_QPDUNES, PARTIAL_CONDENSING_OSQP, FULL_CONDENSING_DAQP
     ocp.solver_options.hessian_approx = 'GAUSS_NEWTON' # 'GAUSS_NEWTON', 'EXACT'
     ocp.solver_options.integrator_type = 'IRK'
-    # ocp.solver_options.print_level = 1
     ocp.solver_options.nlp_solver_type = 'SQP' # SQP_RTI, SQP
     ocp.solver_options.globalization = 'MERIT_BACKTRACKING' # turns on globalization
 
@@ -91,7 +88,6 @@ def main():
     simU = np.zeros((N, nu))
 
     status = ocp_solver.solve()
-    # ocp_solver.print_statistics() # encapsulates: stat = ocp_solver.get_stats("statistics")
 
     if status != 0:
         raise Exception(f'acados returned status {status}.')
@@ -101,8 +97,6 @@ def main():
         simX[i,:] = ocp_solver.get(i, "x")
         simU[i,:] = ocp_solver.get(i, "u")
     simX[N,:] = ocp_solver.get(N, "x")
-    
-    print(simX)
 
     plot_pendulum(np.linspace(0, Tf, N+1), Fmax, simU, simX, latexify=True, time_label=model.t_label, x_labels=model.x_labels, u_labels=model.u_labels)
 

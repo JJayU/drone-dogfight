@@ -8,19 +8,8 @@ import casadi as ca
 
 def compute_u(self, state):
     
-    # self.ocp_solver.reset()
-    # self.ocp_solver.set(0, "x", np.array([0.0, 0.0]))
-    # status = self.ocp_solver.solve()
-        
-    # if status != 0:
-    #     raise Exception(f'acados returned status {status}.')
-    # self.ocp_solver.reset()
-    # self.ocp_solver.set(0, "x", np.array([state[0], state[1]]))
-    
-    theta = state[0] + np.pi
+    theta = state[0] + np.pi # Conversion (0.0 is down in Acados and up in Gym)
     dtheta = state[1]
-    
-    # self.ocp.constraints.x0 = np.array([theta, dtheta])
     
     solver = self.ocp_solver
     
@@ -29,18 +18,13 @@ def compute_u(self, state):
     
     status = solver.solve()
     
-    # self.ocp_solver.options_set('rti_phase', 1)
-    # self.ocp_solver.solve()
-    # self.ocp_solver.set(0, "lbx", np.array([theta, dtheta]))
-    # self.ocp_solver.set(0, "ubx", np.array([theta, dtheta]))
-    # self.ocp_solver.options_set('rti_phase', 2)
-    # self.ocp_solver.solve()
+    if status != 0:
+        raise Exception(f'acados returned status {status}.')
 
     print(theta)
     print(dtheta)
     print(solver.get(0, "u"))
     print(solver.get_stats('time_tot'))
-
     
     return solver.get(0, "u")
 
@@ -55,8 +39,6 @@ class MPCController(Controller):
         self.ocp.model = self.model
 
         Tf = 3.0
-        nx = self.model.x.rows()
-        nu = self.model.u.rows()
         N = 1000
 
         # set prediction horizon
@@ -90,13 +72,9 @@ class MPCController(Controller):
 
         # set options
         self.ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
-        # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_QPOASES, FULL_CONDENSING_HPIPM,
-        # PARTIAL_CONDENSING_QPDUNES, PARTIAL_CONDENSING_OSQP, FULL_CONDENSING_DAQP
         self.ocp.solver_options.hessian_approx = 'GAUSS_NEWTON' # 'GAUSS_NEWTON', 'EXACT'
         self.ocp.solver_options.integrator_type = 'ERK'
-        # ocp.solver_options.print_level = 1
         self.ocp.solver_options.nlp_solver_type = 'SQP_RTI' # SQP_RTI, SQP
-        # self.ocp.solver_options.globalization = 'MERIT_BACKTRACKING' # turns on globalization
         
         self.ocp_solver = AcadosOcpSolver(self.ocp)
 
