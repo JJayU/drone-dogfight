@@ -3,8 +3,10 @@ build/
 install/
 log/
 .vscode/
+c_generated_code/
 
 # Pliki tymczasowe
 *.pyc
 __pycache__/
 src/crazyswarm2
+acados_ocp.json
