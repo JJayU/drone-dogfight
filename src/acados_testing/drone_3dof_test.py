@@ -28,12 +28,12 @@ def main():
     # path cost
     ocp.cost.cost_type = 'NONLINEAR_LS'
     ocp.model.cost_y_expr = ca.vertcat(model.x, model.u)
-    ocp.cost.yref = np.array([0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    ocp.cost.yref = np.array([0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     ocp.cost.W = ca.diagcat(Q_mat, R_mat).full()
 
     # terminal cost
     ocp.cost.cost_type_e = 'NONLINEAR_LS'
-    ocp.cost.yref_e = np.array([0.0, 0.0, 0.5, 0.0, 0.0, 0.0])
+    ocp.cost.yref_e = np.array([0.0, 0.1, 0.0, 0.0, 0.0, 0.0])
     ocp.model.cost_y_expr_e = model.x
     ocp.cost.W_e = Q_mat
 

@@ -48,7 +48,7 @@ class MPCControlNode(Node):
             10
         )
         
-        self.dt = 0.005
+        self.dt = 0.01
         self.timer = self.create_timer(self.dt, self.control_update)
         
         self.last_time = 0.0
@@ -63,25 +63,25 @@ class MPCControlNode(Node):
         self.ocp.model = self.model
 
         Tf = 1.0
-        N = 200
+        N = 50
 
         # set prediction horizon
         self.ocp.solver_options.N_horizon = N
         self.ocp.solver_options.tf = Tf
 
         # cost matrices
-        Q_mat = 2*np.diag([1e4, 1e4, 1e4, 1e1, 1e1, 1e1])
-        R_mat = 2*np.diag([1e2, 1e2, 1e2, 1e2])
+        Q_mat = 2*np.diag([1e4, 1e4, 1e4, 1e-1, 1e-1, 1e-1])
+        R_mat = 2*np.diag([1e1, 1e1, 1e1, 1e1])
 
         # path cost
         self.ocp.cost.cost_type = 'NONLINEAR_LS'
         self.ocp.model.cost_y_expr = ca.vertcat(self.model.x, self.model.u)
-        self.ocp.cost.yref = np.array([0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        self.ocp.cost.yref = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         self.ocp.cost.W = ca.diagcat(Q_mat, R_mat).full()
 
         # terminal cost
         self.ocp.cost.cost_type_e = 'NONLINEAR_LS'
-        self.ocp.cost.yref_e = np.array([0.0, 0.1, 0.0, 0.0, 0.0, 0.0])
+        self.ocp.cost.yref_e = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         self.ocp.model.cost_y_expr_e = self.model.x
         self.ocp.cost.W_e = Q_mat
 
@@ -116,7 +116,6 @@ class MPCControlNode(Node):
             msg.orientation.y,
             msg.orientation.z
         ]
-        # print(msg)
         self.roll, self.pitch, self.yaw = self.quaternion_to_euler(q)
         
         self.droll = (self.roll - self.prev_roll) / (time.time() - self.last_time)
@@ -149,7 +148,17 @@ class MPCControlNode(Node):
             
             state = np.array([self.roll, self.pitch, self.yaw, self.droll, self.dpitch, self.dyaw])
             
+            target_yaw = np.arctan2(self.target[1] - self.y, self.target[0] - self.x)
+            target_pitch = np.arctan2(self.target[2] - self.z, np.sqrt((self.target[0] - self.x)**2 + (self.target[1] - self.y)**2))
+            
+            yref = np.array([0.0, -target_pitch, target_yaw, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+            
             solver = self.ocp_solver
+            
+            N = self.ocp.solver_options.N_horizon
+            
+            for i in range(N):
+                solver.set(i, 'yref', yref)
     
             solver.set(0, "lbx", state)
             solver.set(0, "ubx", state)
@@ -158,69 +167,16 @@ class MPCControlNode(Node):
             
             if status != 0:
                 # raise Exception(f'acados returned status {status}.')
-                print('acados returned status {status}.')
+                print('Acados returned status {status}.')
 
             # print(solver.get(0, "u"))
-            # print(solver.get_stats('time_tot'))
+            print(solver.get_stats('time_tot'))
             
             u = solver.get(0, "u")
             
-            u = u
-            
             motor_commands = Float32MultiArray()
             motor_commands.data = [float(u[0]), float(u[1]), float(u[2]), float(u[3])]
-            # motor_commands.data = [0.0001, 0.0001, 0.00, 0.00]
             self.motor_pub.publish(motor_commands)
-            
-            print(self.pitch)
-            # print(self.dpitch)
-            
-            # print(state)
-            
-            # self.angle += 0.001
-            
-            # target_x = np.sin(self.angle)
-            # target_y = np.cos(self.angle)
-            
-            # self.x_pos_pid.setpoint = target_x
-            # self.y_pos_pid.setpoint = target_y 
-            
-            # target_yaw = np.arctan2(self.target[1] - self.y, self.target[0] - self.x)
-            
-            # self.height_pid.setpoint = self.target[2] - 0.02
-        
-            # desired_pitch = self.x_pos_pid.update(self.x, self.dt)
-            # desired_roll = self.y_pos_pid.update(self.y, self.dt)
-
-            # desired_pitch = np.clip(desired_pitch, -0.5, 0.5) 
-            # desired_roll = np.clip(desired_roll, -0.5, 0.5) 
-            
-            # self.pitch_pid.setpoint = desired_pitch * np.cos(self.yaw) - desired_roll * np.sin(-self.yaw)
-            # self.roll_pid.setpoint = - desired_roll * np.cos(-self.yaw) + desired_pitch * np.sin(self.yaw)
-            # self.yaw_pid.setpoint = target_yaw
-            
-            # height_control = self.height_pid.update(self.z, self.dt)
-            # pitch_control = self.pitch_pid.update(self.pitch, self.dt)
-            # roll_control = self.roll_pid.update(self.roll, self.dt)
-            # yaw_control = self.yaw_pid.update(self.yaw, self.dt)
-            
-            # m1 = height_control - pitch_control + roll_control - yaw_control
-            # m2 = height_control - pitch_control - roll_control + yaw_control
-            # m3 = height_control + pitch_control - roll_control - yaw_control
-            # m4 = height_control + pitch_control + roll_control + yaw_control
-            
-            # max_thrust = max(abs(m1), abs(m2), abs(m3), abs(m4))
-            # if max_thrust > 1.0:
-            #     m1 /= max_thrust
-            #     m2 /= max_thrust
-            #     m3 /= max_thrust
-            #     m4 /= max_thrust
-            
-            # motor_commands = Float32MultiArray()
-            # motor_commands.data = [float(m1), float(m2), float(m3), float(m4)]
-            # self.motor_pub.publish(motor_commands)
-            
-            # print('hello')
         
 def main():
     rclpy.init()

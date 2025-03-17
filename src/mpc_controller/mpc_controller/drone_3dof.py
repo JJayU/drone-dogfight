@@ -6,13 +6,13 @@ def export_drone_3dof_model() -> AcadosModel:
     model_name = 'drone_3dof'
 
     # constants
-    m = 1.0# mass of the ball [kg]
-    g = 9.81 # gravity constant [m/s^2]
-    Ix = 2.3951e-5
-    Iy = 2.3951e-5
-    Iz = 3.2347e-5
-    d = 0.046 * 10
-    c = 0.12
+    m = 1.0
+    g = 9.81 
+    Ix = 1.657171e-5
+    Iy = Ix#1.6655602e-5
+    Iz = 2.9261652e-5
+    d = 0.046
+    c = 0.00089468 * 10 # TODO why without this *10 does this oscillate???
 
     # set up states & controls   
     roll = SX.sym('roll')
