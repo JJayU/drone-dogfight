@@ -68,7 +68,7 @@
   <worldbody>
     <body name="cf2" pos="0 0 0.1" childclass="cf2">
       <freejoint/>
-      <inertial pos="0 0 0" mass="0.027" diaginertia="2.3951e-5 2.3951e-5 3.2347e-5"/>
+      <inertial pos="0 0 0" mass="0.028" fullinertia="1.657171e-5 1.6655602e-5 2.9261652e-5 8.30806e-7 7.18277e-7 1.800197e-6"/>
       <camera name="track" pos="-1 0 .5" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
       <geom mesh="cf2_0" material="propeller_plastic" class="visual"/>
       <geom mesh="cf2_1" material="medium_gloss_plastic" class="visual"/>
@@ -119,10 +119,10 @@
   </worldbody>
 
   <actuator>
-    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0  0. 0.12 0. 0. -0.005" site="motor0"/>
-    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0  0. 0.12 0. 0.  0.005" site="motor1"/>
-    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0  0. 0.12 0. 0. -0.005" site="motor2"/>
-    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0  0. 0.12 0. 0.  0.005" site="motor3"/>
+    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0 0 0.15 0 0 -0.00089468" site="motor0"/>
+    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0 0 0.15 0 0  0.00089468" site="motor1"/>
+    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0 0 0.15 0 0 -0.00089468" site="motor2"/>
+    <motor ctrllimited="true" ctrlrange="0.0 1.0" gear="0 0 0.15 0 0  0.00089468" site="motor3"/>
   </actuator>
 
   <sensor>
