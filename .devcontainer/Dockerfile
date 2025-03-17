@@ -43,7 +43,9 @@ RUN pip3 install --upgrade --no-cache-dir \
     setuptools \
     wheel \
     twine \
-    check-wheel-contents
+    check-wheel-contents \
+    gymnasium \
+    pygame
 
 # Build ROS2 workspace
 RUN . /opt/ros/humble/setup.sh 

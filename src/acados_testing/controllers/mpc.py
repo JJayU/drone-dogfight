@@ -39,7 +39,7 @@ class MPCController(Controller):
         self.ocp.model = self.model
 
         Tf = 3.0
-        N = 1000
+        N = 200
 
         # set prediction horizon
         self.ocp.solver_options.N_horizon = N

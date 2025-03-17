@@ -83,6 +83,8 @@ class SimNode(Node):
         elif self.viewer and not self.viewer.is_alive:
             self.running = False
             self.destroy_node()
+            
+        self.data.qpos[0:3] = [0, 0, 1]
 
         self.publish_state()
         
