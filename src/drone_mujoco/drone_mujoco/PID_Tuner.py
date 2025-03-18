@@ -29,6 +29,7 @@ class PIDTuner(Node):
         self.pitch = 0.0
         self.yaw = 0.0
         self.last_time = 0.0
+        self.angle = 0.0
         
         # Subscriptions
         self.gps_sub = self.create_subscription(PointStamped, 'gps', self.gps_callback, 10)
@@ -45,7 +46,7 @@ class PIDTuner(Node):
         
         # Optimization variables
         self.current_trial = None
-        self.max_iterations = 1000  # Increased from 2000 for better results
+        self.max_iterations = 1000  
         self.error_samples = {}
         self.optimization_complete = threading.Event()
         
@@ -73,7 +74,7 @@ class PIDTuner(Node):
             self.best_values.append(study.best_value)
             self.iteration_numbers.append(len(study.trials))
             
-        self.study.optimize(self.objective, n_trials=5, callbacks=[track_best_value])
+        self.study.optimize(self.objective, n_trials=100, callbacks=[track_best_value])
         
         self.best_params = self.study.best_params
         self.get_logger().info(f"Best parameters: {self.best_params}")
@@ -161,8 +162,7 @@ class PIDTuner(Node):
         self.target_y = 1.0
         self.target_z = 1.0
         self.target_yaw = 0.7
-
-        # PID parameters with expanded ranges
+        
         kp_x = trial.suggest_float('kp_x', 0.05, 1.0)
         ki_x = trial.suggest_float('ki_x', 0.0, 0.2)
         kd_x = trial.suggest_float('kd_x', 0.01, 0.5)
@@ -188,7 +188,9 @@ class PIDTuner(Node):
         kd_yaw = trial.suggest_float('kd_yaw', 0.002, 0.05)
         
         d_filter = trial.suggest_float('d_filter', 0.5, 0.95)
-        
+
+
+                
         # Initialize PID controllers
         self.x_pos_pid = PID(kp_x, ki_x, kd_x, setpoint=self.target_x, name="X Position", d_filter=d_filter)
         self.y_pos_pid = PID(kp_y, ki_y, kd_y, setpoint=self.target_y, name="Y Position", d_filter=d_filter)
@@ -220,7 +222,7 @@ class PIDTuner(Node):
         # Weights for errors
         weights = {
             "x": 1.0, "y": 1.0, "z": 1.0,
-            "roll": 0.5, "pitch": 0.5, "yaw": 0.2,
+            "roll": 0.4, "pitch": 0.4, "yaw": 0.7,
         }
         
         # Total weighted error
@@ -233,17 +235,45 @@ class PIDTuner(Node):
         self.timer_counter += 1
         
         if (time.time() - self.last_time < 1):
+            
+            self.angle += 0.001
+            
+            # Figure-8 pattern in X-Y plane
+            target_x = np.sin(self.angle) * 1.5
+            target_y = np.sin(self.angle * 2) * 0.8
+            
+            # Add some variation in height using a different frequency
+            target_z = 1.0 + 0.3 * np.sin(self.angle * 0.5)
+            self.height_pid.setpoint = target_z
+            
+            # Add some acceleration and deceleration
+            speed_factor = 0.5 + 0.5 * np.sin(self.angle * 0.25)
+            self.angle += 0.0005 * speed_factor  # Variable speed
+            
+            # Target position with offset
+            self.x_pos_pid.setpoint = target_x + 1
+            self.y_pos_pid.setpoint = target_y + 1
+            
+            # Target yaw can point to a moving reference point
+            reference_x = np.cos(self.angle * 1.3) * 0.5 + 1
+            reference_y = np.sin(self.angle * 1.7) * 0.5 + 1
+            target_yaw = np.arctan2(reference_y - self.y, reference_x - self.x)
+            
             # Calculate desired roll and pitch based on position
             desired_pitch = self.x_pos_pid.update(self.x, 0.005)
             desired_roll = self.y_pos_pid.update(self.y, 0.005)
             
             # Limit angles
-            desired_pitch = np.clip(desired_pitch, -0.3, 0.3)
-            desired_roll = np.clip(desired_roll, -0.3, 0.3)
+            desired_pitch = np.clip(desired_pitch, -0.5, 0.5)
+            desired_roll = np.clip(desired_roll, -0.5, 0.5)
             
             # Transform roll and pitch considering current yaw
             self.pitch_pid.setpoint = desired_pitch * np.cos(self.yaw) - desired_roll * np.sin(-self.yaw)
             self.roll_pid.setpoint = -desired_roll * np.cos(-self.yaw) + desired_pitch * np.sin(self.yaw)
+            
+            self.pitch_pid.setpoint = desired_pitch * np.cos(self.yaw) - desired_roll * np.sin(-self.yaw)
+            self.roll_pid.setpoint = - desired_roll * np.cos(-self.yaw) + desired_pitch * np.sin(self.yaw)
+            self.yaw_pid.setpoint = target_yaw
             
             # Calculate controls
             height_control = self.height_pid.update(self.z, 0.005)

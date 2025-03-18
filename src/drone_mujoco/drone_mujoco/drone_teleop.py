@@ -30,7 +30,7 @@ class PID:
     def update(self, measured_value, dt):
         current_time = time.time() - self.start_time
         
-        if self.name == "yaw":
+        if self.name == "Yaw":
             error = np.arctan2(np.sin(self.setpoint - measured_value), np.cos(self.setpoint - measured_value))
         else:
             error = self.setpoint - measured_value
@@ -38,7 +38,7 @@ class PID:
         self.integral = np.clip(self.integral + error * dt, -5, 5)
 
         derivative = (error - self.previous_error) / max(dt, 0.001)
-        derivative = 0.682045 * self.prev_derivative + (1-0.682045) * derivative
+        derivative = 0.532386 * self.prev_derivative + (1-0.532386) * derivative
         self.prev_derivative = derivative
         
         p_term = self.kp * error
@@ -93,14 +93,15 @@ class ControlNode(Node):
             10
         )
         
-        self.x_pos_pid  = PID(kp=0.521558, ki=0.086138, kd=0.252982, setpoint=0.0, name="X Position")
-        self.y_pos_pid  = PID(kp=0.662796, ki=0.088061, kd=0.375998, setpoint=0.0, name="Y Position")
+        self.x_pos_pid  = PID(kp=0.309787, ki=0.082644, kd=0.120130, setpoint=0.0, name="X Position")
+        self.y_pos_pid  = PID(kp=0.393318, ki=0.092664, kd=0.128470, setpoint=0.0, name="Y Position")
 
-        self.roll_pid   = PID(kp=0.220546, ki=0.037910, kd=0.023825, setpoint=0.0, name="Roll")
-        self.pitch_pid  = PID(kp=0.220546, ki=0.037910, kd=0.023825, setpoint=0.0, name="Pitch")
-        self.yaw_pid    = PID(kp=0.044144, ki=0.018837, kd=0.029852, setpoint=0.0, name="yaw")
+        self.roll_pid   = PID(kp=0.201829, ki=0.058544, kd=0.038006, setpoint=0.0, name="Roll")
+        self.pitch_pid  = PID(kp=0.261965, ki=0.066790, kd=0.038789, setpoint=0.0, name="Pitch")
+        self.yaw_pid    = PID(kp=0.028448, ki=0.017880, kd=0.031944, setpoint=0.0, name="Yaw")
 
-        self.height_pid = PID(kp=1.704485, ki=0.389549, kd=0.908491, setpoint=1.0, name="Height")
+        self.height_pid = PID(kp=1.229057, ki=0.232525, kd=0.316635, setpoint=1.0, name="Height")
+
 
         self.dt = 0.005
         self.timer = self.create_timer(self.dt, self.control_update)
@@ -261,8 +262,8 @@ class ControlNode(Node):
             desired_pitch = self.x_pos_pid.update(self.x, self.dt)
             desired_roll = self.y_pos_pid.update(self.y, self.dt)
 
-            desired_pitch = np.clip(desired_pitch, -0.3, 0.3) 
-            desired_roll = np.clip(desired_roll, -0.3, 0.3) 
+            desired_pitch = np.clip(desired_pitch, -0.5, 0.5) 
+            desired_roll = np.clip(desired_roll, -0.5, 0.5) 
             
             self.pitch_pid.setpoint = desired_pitch * np.cos(self.yaw) - desired_roll * np.sin(-self.yaw)
             self.roll_pid.setpoint = - desired_roll * np.cos(-self.yaw) + desired_pitch * np.sin(self.yaw)

@@ -1,23 +1,23 @@
 Best Parameters:
-kp_x: 0.429115
-ki_x: 0.153212
-kd_x: 0.160462
-kp_y: 0.974292
-ki_y: 0.083700
-kd_y: 0.020513
-kp_z: 0.585550
-ki_z: 0.555709
-kd_z: 0.665912
-kp_roll: 0.072816
-ki_roll: 0.061724
-kd_roll: 0.003602
-kp_pitch: 0.274235
-ki_pitch: 0.044967
-kd_pitch: 0.022626
-kp_yaw: 0.045336
-ki_yaw: 0.000361
-kd_yaw: 0.015121
-d_filter: 0.548727
+kp_x: 0.309787
+ki_x: 0.082644
+kd_x: 0.120130
+kp_y: 0.393318
+ki_y: 0.092664
+kd_y: 0.128470
+kp_z: 1.229057
+ki_z: 0.232525
+kd_z: 0.316635
+kp_roll: 0.201829
+ki_roll: 0.058544
+kd_roll: 0.038006
+kp_pitch: 0.261965
+ki_pitch: 0.066790
+kd_pitch: 0.038789
+kp_yaw: 0.028448
+ki_yaw: 0.017880
+kd_yaw: 0.031944
+d_filter: 0.532386
 
-Best cost value: 0.456738
-Total number of trials: 5
+Best cost value: 1.697477
+Total number of trials: 100
