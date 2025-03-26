@@ -84,7 +84,7 @@ class SimNode(Node):
             self.running = False
             self.destroy_node()
             
-        self.data.qpos[0:3] = [0, 0, 1]
+        # self.data.qpos[0:3] = [0, 0, 1]
 
         self.publish_state()
         

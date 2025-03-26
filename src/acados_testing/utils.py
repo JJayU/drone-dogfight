@@ -18,7 +18,7 @@ def plot_pendulum(t, u_max, U, X_true, latexify=False, plt_show=True, time_label
     if latexify:
         latexify_plot()
 
-    nx = X_true.shape[1]
+    nx = X_true.shape[1] - 1
     nu = U.shape[1] if U.ndim > 1 else 1  # Number of control inputs
 
     fig, axes = plt.subplots(nx + nu, 1, sharex=True)

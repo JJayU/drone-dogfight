@@ -19,7 +19,8 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
-            '3dof = mpc_controller.3dof:main'
+            '3dof = mpc_controller.3dof:main',
+            '6dof = mpc_controller.6dof:main'
         ],
     },
 )
