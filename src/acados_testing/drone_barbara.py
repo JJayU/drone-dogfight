@@ -1,122 +1,82 @@
-# The MIT License (MIT)
-#
-# Copyright 2020 Barbara Barros Carlos, Tommaso Sartor
-#
-# This file is part of crazyflie_nmpc.
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
-
 from acados_template import AcadosModel
 from casadi import SX, vertcat
 
-def export_ode_model():
-
+def export_drone_6dof_model():
     model_name = 'crazyflie'
 
     # parameters
-    g0  = 9.8066     # [m.s^2] accerelation of gravity
-    mq  = 33e-3      # [kg] total mass (with one marker)
-    Ixx = 1.395e-5   # [kg.m^2] Inertia moment around x-axis
-    Iyy = 1.395e-5   # [kg.m^2] Inertia moment around y-axis
-    Izz = 2.173e-5   # [kg.m^2] Inertia moment around z-axis
-    Cd  = 7.9379e-06 # [N/krpm^2] Drag coef
-    Ct  = 3.25e-4    # [N/krpm^2] Thrust coef
-    dq  = 65e-3      # [m] distance between motors' center
-    l   = dq/2       # [m] distance between motors' center and the axis of rotation
+    g = 9.8066    # [m/s^2] gravity
+    m = 33e-3     # [kg] mass
+    Ixx = 1.395e-5
+    Iyy = 1.395e-5
+    Izz = 2.173e-5
+    Cd = 7.9379e-06 # [N/krpm^2] Drag coef
+    Ct = 3.25e-4    # [N/krpm^2] Thrust coef
+    d = 65e-3 / 2   # [m] half distance between motors
 
-    # states (f_exp)
-    xq = SX.sym('xq')
-    yq = SX.sym('yq')
-    zq = SX.sym('zq')
+    # states
+    x = SX.sym('x')
+    y = SX.sym('y')
+    z = SX.sym('z')
     q1 = SX.sym('q1')
     q2 = SX.sym('q2')
     q3 = SX.sym('q3')
     q4 = SX.sym('q4')
-    vbx = SX.sym('vbx')
-    vby = SX.sym('vby')
-    vbz = SX.sym('vbz')
-    wx = SX.sym('wx')
-    wy = SX.sym('wy')
-    wz = SX.sym('wz')
-    x = vertcat(xq, yq, zq, q1, q2, q3, q4, vbx, vby, vbz, wx, wy, wz)
+    dx = SX.sym('dx')
+    dy = SX.sym('dy')
+    dz = SX.sym('dz')
+    droll = SX.sym('droll')
+    dpitch = SX.sym('dpitch')
+    dyaw = SX.sym('dyaw')
+    states = vertcat(x, y, z, q1, q2, q3, q4, dx, dy, dz, droll, dpitch, dyaw)
 
     # controls
     w1 = SX.sym('w1')
     w2 = SX.sym('w2')
     w3 = SX.sym('w3')
     w4 = SX.sym('w4')
-    u = vertcat(w1, w2, w3, w4) # motor speed
+    controls = vertcat(w1, w2, w3, w4)
 
-    # for f_impl
-    xq_dot = SX.sym('xq_dot')
-    yq_dot = SX.sym('yq_dot')
-    zq_dot = SX.sym('zq_dot')
-    q1_dot = SX.sym('q1_dot')
-    q2_dot = SX.sym('q2_dot')
-    q3_dot = SX.sym('q3_dot')
-    q4_dot = SX.sym('q4_dot')
-    vbx_dot = SX.sym('vbx_dot')
-    vby_dot = SX.sym('vby_dot')
-    vbz_dot = SX.sym('vbz_dot')
-    wx_dot = SX.sym('wx_dot')
-    wy_dot = SX.sym('wy_dot')
-    wz_dot = SX.sym('wz_dot')
-    xdot = vertcat(xq_dot, yq_dot, zq_dot, q1_dot, q2_dot, q3_dot, q4_dot, vbx_dot, vby_dot, vbz_dot, wx_dot, wy_dot, wz_dot)
+    # state derivatives
+    xdot = SX.sym('xdot', states.shape[0])
 
+    # Forces and torques
+    U1 = Ct * (w1**2 + w2**2 + w3**2 + w4**2)
+    U2 = Ct * d * (w3**2 + w4**2 - w1**2 - w2**2)
+    U3 = Ct * d * (w1**2 + w4**2 - w2**2 - w3**2)
+    U4 = Cd * (w2**2 + w4**2 - w1**2 - w3**2)
 
-    # Model equations
-    dxq = vbx*(2*q1**2 + 2*q2**2 - 1) - vby*(2*q1*q4 - 2*q2*q3) + vbz*(2*q1*q3 + 2*q2*q4)
-    dyq = vby*(2*q1**2 + 2*q3**2 - 1) + vbx*(2*q1*q4 + 2*q2*q3) - vbz*(2*q1*q2 - 2*q3*q4)
-    dzq = vbz*(2*q1**2 + 2*q4**2 - 1) - vbx*(2*q1*q3 - 2*q2*q4) + vby*(2*q1*q2 + 2*q3*q4)
-    dq1 = - (q2*wx)/2 - (q3*wy)/2 - (q4*wz)/2
-    dq2 = (q1*wx)/2 - (q4*wy)/2 + (q3*wz)/2
-    dq3 = (q4*wx)/2 + (q1*wy)/2 - (q2*wz)/2
-    dq4 = (q2*wy)/2 - (q3*wx)/2 + (q1*wz)/2
-    dvbx = vby*wz - vbz*wy + g0*(2*q1*q3 - 2*q2*q4)
-    dvby = vbz*wx - vbx*wz - g0*(2*q1*q2 + 2*q3*q4)
-    dvbz = vbx*wy - vby*wx - g0*(2*q1**2 + 2*q4**2 - 1) + (Ct*(w1**2 + w2**2 + w3**2 + w4**2))/mq
-    dwx = -(Ct*l*(w1**2 + w2**2 - w3**2 - w4**2) - Iyy*wy*wz + Izz*wy*wz)/Ixx
-    dwy = -(Ct*l*(w1**2 - w2**2 - w3**2 + w4**2) + Ixx*wx*wz - Izz*wx*wz)/Iyy
-    dwz = -(Cd*(w1**2 - w2**2 + w3**2 - w4**2) - Ixx*wx*wy + Iyy*wx*wy)/Izz
+    # Dynamics
+    f_expl = vertcat(
+        dx,
+        dy,
+        dz,
+        - (q2 * droll) / 2 - (q3 * dpitch) / 2 - (q4 * dyaw) / 2,
+        (q1 * droll) / 2 - (q4 * dpitch) / 2 + (q3 * dyaw) / 2,
+        (q4 * droll) / 2 + (q1 * dpitch) / 2 - (q2 * dyaw) / 2,
+        (q2 * dpitch) / 2 - (q3 * droll) / 2 + (q1 * dyaw) / 2,
+        g * (2 * q1 * q3 - 2 * q2 * q4),
+        -g * (2 * q1 * q2 + 2 * q3 * q4),
+        U1 / m,
+        U2 / Ixx,
+        U3 / Iyy,
+        U4 / Izz
+    )
 
-
-    # Explicit and Implicit functions
-    f_expl = vertcat(dxq, dyq, dzq, dq1, dq2, dq3, dq4, dvbx, dvby, dvbz, dwx, dwy, dwz)
     f_impl = xdot - f_expl
 
-    # algebraic variables
-    z = []
-
-    # parameters
-    p = []
-
-    # dynamics
+    # Model definition
     model = AcadosModel()
-
     model.f_impl_expr = f_impl
     model.f_expl_expr = f_expl
-    model.x = x
+    model.x = states
     model.xdot = xdot
-    model.u = u
-    model.z = z
-    model.p = p
+    model.u = controls
     model.name = model_name
+
+    # Labels
+    model.x_labels = [r'x', r'y', r'z', r'q1', r'q2', r'q3', r'q4', r'dx', r'dy', r'dz', r'droll', r'dpitch', r'dyaw']
+    model.u_labels = ['w1', 'w2', 'w3', 'w4']
+    model.t_label = 't [s]'
 
     return model

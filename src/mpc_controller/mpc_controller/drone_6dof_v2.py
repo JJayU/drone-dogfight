@@ -38,7 +38,7 @@ def export_drone_6dof_model():
     u = vertcat(T1, T2, T3, T4)
     
     # Siła nośna
-    T = T1 * 0.15 + T2 * 0.15 + T3 * 0.15 + T4 * 0.15 
+    T = (T1 + T2 + T3 + T4) * 0.15 
     
     # Macierz rotacji
     R = SX.zeros(3, 3)
@@ -57,9 +57,9 @@ def export_drone_6dof_model():
     dv = (1/m) * (mtimes(R, vertcat(0, 0, T)) - vertcat(0, 0, m*g))
     
     # Dynamika rotacji
-    tau_x = l * (T1 + T4 - T2 - T3)
-    tau_y = l * (T3 + T4 - T1 - T2)
-    tau_z = k * (T2 + T4 - T1 - T3)
+    tau_x = l * (T1 + T4 - T2 - T3) #/ 0.15
+    tau_y = l * (T3 + T4 - T1 - T2) #/ 0.15
+    tau_z = k * (T2 + T4 - T1 - T3) #* 0.15
     tau = vertcat(tau_x, tau_y, tau_z)
     
     w = vertcat(wx, wy, wz)

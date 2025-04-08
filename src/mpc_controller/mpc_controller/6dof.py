@@ -52,7 +52,7 @@ class MPCControlNode(Node):
             10
         )
         
-        self.dt = 0.01
+        self.dt = 0.02
         self.timer = self.create_timer(self.dt, self.control_update)
         
         self.last_time = 0.0
@@ -70,25 +70,27 @@ class MPCControlNode(Node):
         self.ocp.model = self.model
 
         Tf = 1.0
-        N = 100
+        N = 50
 
         # set prediction horizon
         self.ocp.solver_options.N_horizon = N
         self.ocp.solver_options.tf = Tf
 
         # cost matrices
-        Q_mat = 2*np.diag([1e2, 1e2, 1e2, 1e0, 1e0, 1e0, 1e1, 1e1, 1e1, 1e0, 1e0, 1e0])
+        Q_mat = 2*np.diag([1e1, 1e1, 1e2, 1e0, 1e0, 1e0, 1e2, 1e2, 1e2, 1e0, 1e0, 1e0])
         R_mat = 2*np.diag([1e1, 1e1, 1e1, 1e1])
 
         # path cost
         self.ocp.cost.cost_type = 'NONLINEAR_LS'
         self.ocp.model.cost_y_expr = ca.vertcat(self.model.x, self.model.u)
-        self.ocp.cost.yref = np.array([0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5])
+        #                              x    y    z    dx   dy   dz   r    p    y    dr   dp   dy   m1   m2   m3   m4
+        self.ocp.cost.yref = np.array([0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5])
         self.ocp.cost.W = ca.diagcat(Q_mat, R_mat).full()
 
         # terminal cost
         self.ocp.cost.cost_type_e = 'NONLINEAR_LS'
-        self.ocp.cost.yref_e = np.array([0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0])
+        #                                x    y    z    dx   dy   dz   r    p    y    dr   dp   dy
+        self.ocp.cost.yref_e = np.array([0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         self.ocp.model.cost_y_expr_e = self.model.x
         self.ocp.cost.W_e = Q_mat
 
@@ -99,7 +101,22 @@ class MPCControlNode(Node):
         self.ocp.constraints.idxbu = np.array([0, 1, 2, 3])
 
         self.ocp.constraints.x0 = np.array([0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        
+        # self.ocp.constraints.lbx = np.array([-np.inf, -np.inf, -np.inf
+        #                                      , -np.inf, -np.inf, -np.inf,
+        #                                      -0.5, -0.5, -0.5
+        #                                      , -np.inf, -np.inf, -np.inf])
+        # self.ocp.constraints.ubx = np.array([np.inf, np.inf, np.inf
+        #                                         , np.inf, np.inf, np.inf,
+        #                                         0.5, 0.5, 0.5
+        #                                         , np.inf, np.inf, np.inf])
+        # self.ocp.constraints.idxbx = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+        
+        # self.ocp.constraints.lbx = np.array([-np.pi/4, -np.pi/4, -np.pi/4])
+        # self.ocp.constraints.ubx = np.array([np.pi/4, np.pi/4, np.pi/4]) 
+        # self.ocp.constraints.idxbx = np.array([6, 7, 8])  # Indeksy ograniczanych zmiennych
 
+        
         # set options
         self.ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
         self.ocp.solver_options.hessian_approx = 'GAUSS_NEWTON' # 'GAUSS_NEWTON', 'EXACT'
@@ -114,9 +131,9 @@ class MPCControlNode(Node):
         self.y = msg.point.y
         self.z = msg.point.z
         
-        self.dx = (self.x - self.prev_x) / (time.time() - self.last_time)
-        self.dy = (self.y - self.prev_y) / (time.time() - self.last_time)
-        self.dz = (self.z - self.prev_z) / (time.time() - self.last_time)
+        self.dx = (self.x - self.prev_x) / 0.005#(time.time() - self.last_time)
+        self.dy = (self.y - self.prev_y) / 0.005#(time.time() - self.last_time)
+        self.dz = (self.z - self.prev_z) / 0.005#(time.time() - self.last_time)
         
         self.prev_x, self.prev_y, self.prev_z = self.x, self.y, self.z
         
@@ -131,9 +148,9 @@ class MPCControlNode(Node):
         ]
         self.roll, self.pitch, self.yaw = self.quaternion_to_euler(q)
         
-        self.droll = (self.roll - self.prev_roll) / (time.time() - self.last_time)
-        self.dpitch = (self.pitch - self.prev_pitch) / (time.time() - self.last_time)
-        self.dyaw = (self.yaw - self.prev_yaw) / (time.time() - self.last_time)
+        self.droll = (self.roll - self.prev_roll) / 0.005# (time.time() - self.last_time)
+        self.dpitch = (self.pitch - self.prev_pitch) / 0.005#(time.time() - self.last_time)
+        self.dyaw = (self.yaw - self.prev_yaw) / 0.005#(time.time() - self.last_time)
         
         self.prev_roll, self.prev_pitch, self.prev_yaw = self.roll, self.pitch, self.yaw
         
@@ -161,10 +178,10 @@ class MPCControlNode(Node):
             
             state = np.array([self.x, self.y, self.z, self.dx, self.dy, self.dz, self.roll, self.pitch, self.yaw, self.droll, self.dpitch, self.dyaw])
             
-            # target_yaw = np.arctan2(self.target[1] - self.y, self.target[0] - self.x)
+            target_yaw = np.arctan2(self.target[1] - self.y, self.target[0] - self.x)
             # target_pitch = np.arctan2(self.target[2] - self.z, np.sqrt((self.target[0] - self.x)**2 + (self.target[1] - self.y)**2))
             
-            # yref = np.array([0.0, -target_pitch, target_yaw, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+            yref = np.array([0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5])
             # yref = np.array([0.1, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
             
             solver = self.ocp_solver
@@ -173,6 +190,8 @@ class MPCControlNode(Node):
             
             # for i in range(N):
             #     solver.set(i, 'yref', yref)
+                
+            # solver.set(N, 'yref', yref)
     
             solver.set(0, "lbx", state)
             solver.set(0, "ubx", state)

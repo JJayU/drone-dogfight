@@ -12,7 +12,7 @@ def export_drone_6dof_model() -> AcadosModel:
     Iy = Ix#1.6655602e-5
     Iz = 2.9261652e-5
     d = 0.046
-    c = 0.00089468 *10 # TODO why without this *10 does this oscillate???
+    c = 0.00089468 * 10 # TODO why without this *10 does this oscillate???
     k_p = 0.15
 
     # set up states & controls   
@@ -53,9 +53,9 @@ def export_drone_6dof_model() -> AcadosModel:
 
     xdot = vertcat(px_dot, py_dot, pz_dot, dpx_dot, dpy_dot, dpz_dot, roll_dot, pitch_dot, yaw_dot, droll_dot, dpitch_dot, dyaw_dot)
     
-    U1 = (F1 + F2 + F3 + F4) * 0.15 - m * g 
-    U2 = (d / sqrt(2)) * (F1 + F3 - F2 - F4)             
-    U3 = (d / sqrt(2)) * (F1 + F2 - F3 - F4)               
+    U1 = (F1 + F2 + F3 + F4) * k_p - m * g 
+    U2 = (d) * (F1 + F3 - F2 - F4)        
+    U3 = (d) * (F1 + F2 - F3 - F4)           
     U4 = c * (F2 + F4 - F1 - F3)
     
     # dynamics
