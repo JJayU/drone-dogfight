@@ -41,6 +41,8 @@ class SimNode(Node):
 
         self.gps_publisher = self.create_publisher(PointStamped, 'gps', 10)
         self.imu_publisher = self.create_publisher(Imu, 'imu', 10)
+        
+        self.full_state_publisher = self.create_publisher(Float32MultiArray, 'full_state', 10)
 
     def motor_listener_callback(self, msg):
         if len(msg.data) == 4:
@@ -51,6 +53,21 @@ class SimNode(Node):
     def set_control(self, motor_commands):
         for i in range(4):
             self.data.ctrl[i] = np.clip(motor_commands[i], 0, 1)
+            
+    def quaternion_to_euler(self, q):
+        w, x, y, z = q
+        sinr_cosp = 2 * (w * x + y * z)
+        cosr_cosp = 1 - 2 * (x * x + y * y)
+        roll = np.arctan2(sinr_cosp, cosr_cosp)
+        
+        sinp = 2 * (w * y - z * x)
+        pitch = np.arcsin(sinp)
+        
+        siny_cosp = 2 * (w * z + x * y)
+        cosy_cosp = 1 - 2 * (y * y + z * z)
+        yaw = np.arctan2(siny_cosp, cosy_cosp)
+        
+        return roll, pitch, yaw
 
     def publish_state(self):
         x, y, z = self.data.qpos[0:3]
@@ -71,6 +88,19 @@ class SimNode(Node):
         imu_msg.orientation.y = quaternion[2]
         imu_msg.orientation.z = quaternion[3]
         self.imu_publisher.publish(imu_msg)
+        
+        full_state_msg = Float32MultiArray()
+        position = self.data.qpos[0:3]
+        speed = self.data.qvel[0:3]
+        orientation = self.data.qpos[3:7]
+        # Convert quaternion to Euler angles
+        euler_angles = self.quaternion_to_euler(orientation)
+        # Calculate angular velocity in roll, pitch, yaw (RPY) space
+        angular_velocity = self.data.qvel[3:6]
+        # Combine position, speed, orientation, and angular velocity into a single observation vector
+        observation = np.concatenate([position, speed, euler_angles, angular_velocity])
+        full_state_msg.data = observation.tolist()
+        self.full_state_publisher.publish(full_state_msg)
 
     def loop(self):
         mujoco.mj_step(self.model, self.data)

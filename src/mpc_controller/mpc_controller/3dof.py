@@ -49,12 +49,14 @@ class MPCControlNode(Node):
         )
         
         self.dt = 0.02
-        self.timer = self.create_timer(self.dt, self.control_update)
+        # self.timer = self.create_timer(self.dt, self.control_update)
         
         self.last_time = 0.0
         self.prev_roll = 0.0
         self.prev_pitch = 0.0   
         self.prev_yaw = 0.0
+        
+        self.target = [0.0, 0.0, 0.0]
         
         ### MPC Controller init
         self.ocp = AcadosOcp()
@@ -108,6 +110,8 @@ class MPCControlNode(Node):
         self.z = msg.point.z
         
         self.last_time = msg.header.stamp.sec + msg.header.stamp.nanosec / 1000000000.
+        
+        self.control_update()
         
     def imu_callback(self, msg):
         q = [
