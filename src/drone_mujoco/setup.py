@@ -21,7 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             'sim = drone_mujoco.sim:main',
-            'teleop = drone_mujoco.drone_teleop:main'
+            'teleop = drone_mujoco.drone_teleop:main',
+            'crazyflie_interface = drone_mujoco.real_drone_control:main',
         ],
     },
 )

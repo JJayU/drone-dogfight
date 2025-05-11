@@ -1,27 +1,35 @@
 import mujoco
-import mujoco_viewer
 import numpy as np
 import rclpy
 from rclpy.node import Node
 import os
 from std_msgs.msg import Float32MultiArray
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import PointStamped, PoseStamped
 from sensor_msgs.msg import Imu
 from ament_index_python.packages import get_package_share_directory
+import time
 
 class SimNode(Node):
-    def __init__(self):
+    def __init__(self, use_gui=False):
         super().__init__('sim_node')
+        self.use_gui = use_gui
 
         path = '/home/ws/src/drone_mujoco/model/scene.xml'
 
         self.model = mujoco.MjModel.from_xml_path(path)
         self.data = mujoco.MjData(self.model)
-        self.viewer = mujoco_viewer.MujocoViewer(self.model, self.data)
-
-        self.model.opt.timestep = 0.005
-        self.create_timer(0.005, self.loop)
+        
+        if self.use_gui:
+            import mujoco_viewer
+            self.viewer = mujoco_viewer.MujocoViewer(self.model, self.data)
+        else:
+            self.viewer = None
+        
+        self.model.opt.timestep = 0.05
+        self.create_timer(self.model.opt.timestep, self.loop)
         self.running = True
+        
+        self.prev_time = 0.0
 
         self.motor_subscription = self.create_subscription(
             Float32MultiArray,
@@ -33,6 +41,8 @@ class SimNode(Node):
 
         self.gps_publisher = self.create_publisher(PointStamped, 'gps', 10)
         self.imu_publisher = self.create_publisher(Imu, 'imu', 10)
+        
+        self.pose_publisher = self.create_publisher(PoseStamped, 'optitrack/rigid_body_0', 10)
 
     def motor_listener_callback(self, msg):
         if len(msg.data) == 4:
@@ -43,40 +53,58 @@ class SimNode(Node):
     def set_control(self, motor_commands):
         for i in range(4):
             self.data.ctrl[i] = np.clip(motor_commands[i], 0, 1)
-            # print(f"{motor_commands[i]}")
 
     def publish_state(self):
         x, y, z = self.data.qpos[0:3]
 
-        gps_msg = PointStamped()
-        gps_msg.header.stamp = self.get_clock().now().to_msg() 
-        gps_msg.header.frame_id = "map"
-        gps_msg.point.x, gps_msg.point.y, gps_msg.point.z = x, y, z
-        self.gps_publisher.publish(gps_msg)
+        # gps_msg = PointStamped()
+        # gps_msg.header.stamp = self.get_clock().now().to_msg()
+        # gps_msg.header.frame_id = "map"
+        # gps_msg.point.x, gps_msg.point.y, gps_msg.point.z = x, y, z
+        # self.gps_publisher.publish(gps_msg)
 
         quaternion = self.data.qpos[3:7]
 
-        imu_msg = Imu()
-        imu_msg.header.stamp = self.get_clock().now().to_msg()
-        imu_msg.header.frame_id = "base_link"
-        imu_msg.orientation.w = quaternion[0]
-        imu_msg.orientation.x = quaternion[1]
-        imu_msg.orientation.y = quaternion[2]
-        imu_msg.orientation.z = quaternion[3]
-        self.imu_publisher.publish(imu_msg)
+        # imu_msg = Imu()
+        # imu_msg.header.stamp = self.get_clock().now().to_msg()
+        # imu_msg.header.frame_id = "base_link"
+        # imu_msg.orientation.w = quaternion[0]
+        # imu_msg.orientation.x = quaternion[1]
+        # imu_msg.orientation.y = quaternion[2]
+        # imu_msg.orientation.z = quaternion[3]
+        # self.imu_publisher.publish(imu_msg)
+        
+        pose_msg = PoseStamped()
+        pose_msg.header.stamp = self.get_clock().now().to_msg()
+        pose_msg.header.frame_id = "map"
+        pose_msg.pose.position.x = x
+        pose_msg.pose.position.y = y
+        pose_msg.pose.position.z = z
+        pose_msg.pose.orientation.w = quaternion[0]
+        pose_msg.pose.orientation.x = quaternion[1]
+        pose_msg.pose.orientation.y = quaternion[2]
+        pose_msg.pose.orientation.z = quaternion[3]
+        self.pose_publisher.publish(pose_msg)
 
     def loop(self):
-        if self.viewer.is_alive:
-            mujoco.mj_step(self.model, self.data)
+        mujoco.mj_step(self.model, self.data)
+        
+        print(f"Iterations per second: {int(1.0 / (time.time() - self.prev_time))}")
+        self.prev_time = time.time()
+        
+        if self.viewer and self.viewer.is_alive:
             self.viewer.render()
-            self.publish_state()
-        else:
+        elif self.viewer and not self.viewer.is_alive:
             self.running = False
             self.destroy_node()
 
+        self.publish_state()
+        
+
 def main():
     rclpy.init()
-    node = SimNode()
+    use_gui = True  # CHANGE IF GUI NEEDED
+    node = SimNode(use_gui=use_gui)
     try:
         while rclpy.ok() and node.running:
             rclpy.spin_once(node)
@@ -84,6 +112,7 @@ def main():
         pass
     node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
