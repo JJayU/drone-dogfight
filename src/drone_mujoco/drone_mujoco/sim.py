@@ -2,7 +2,6 @@ import mujoco
 import numpy as np
 import rclpy
 from rclpy.node import Node
-import os
 from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import Imu

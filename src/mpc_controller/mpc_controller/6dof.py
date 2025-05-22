@@ -1,15 +1,11 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray
-from geometry_msgs.msg import PointStamped
-from sensor_msgs.msg import Imu
+from geometry_msgs.msg import PointStamped, PoseStamped
 import numpy as np
-import time
 from acados_template import AcadosOcp, AcadosOcpSolver
-# from mpc_controller.drone_6dof import export_drone_6dof_model
 from mpc_controller.drone_6dof_v2 import export_drone_6dof_model
 import casadi as ca
-import threading
 
 # This is a ROS2 node that implements an MPC controller for a drone using the acados library.
 
@@ -29,6 +25,13 @@ class MPCControlNode(Node):
             PointStamped,
             'target_point',
             self.target_callback,
+            10
+        )
+        
+        self.drone_des_pos_sub = self.create_subscription(
+            PoseStamped,
+            "drone_des_pos",
+            self.drone_des_pos_callback,
             10
         )
         
@@ -58,13 +61,16 @@ class MPCControlNode(Node):
         self.tempi = 1000
         self.x = 0.0
         self.y = 0.0
+        
+        self.drone_des_pos = [0.0, 0.0, 0.0]
+        self.drone_des_orientation = [0.0, 0.0, 0.0]
 
         # set prediction horizon
         self.ocp.solver_options.N_horizon = N
         self.ocp.solver_options.tf = Tf
 
         # cost matrices
-        Q_mat = 2*np.diag([1e1, 1e1, 1e2, 1e0, 1e0, 1e0, 1e2, 1e2, 1e2, 1e0, 1e0, 1e0])
+        Q_mat = 2*np.diag([1e1, 1e1, 1e2, 1e0, 1e0, 1e0, 1e2, 1e2, 1e3, 1e0, 1e0, 1e0])
         R_mat = 2*np.diag([1e1, 1e1, 1e1, 1e1])
 
         # path cost
@@ -122,22 +128,24 @@ class MPCControlNode(Node):
         
         return roll, pitch, yaw
     
+    def drone_des_pos_callback(self, msg):
+        self.drone_des_pos = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
+        r,p,y = self.quaternion_to_euler([
+            msg.pose.orientation.w, msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z])
+        self.drone_des_orientation = [r, p, y]
         
     def control_update(self):
-        
-        # Generate random positions (temporary for testing)
-        self.tempi += 1
-        if self.tempi > 300:
-            self.tempi = 0
-            self.x = np.random.rand() * 10.0 - 5.0
-            self.y = np.random.rand() * 10.0 - 5.0
-        
-        yaw = np.arctan2(self.target[1] - self.y, self.target[0] - self.x)
         
         solver = self.ocp_solver
         
         # Update reference state
-        yref = np.array([self.x, self.y, self.target[2], 0.0, 0.0, 0.0, 0.0, 0.0, yaw, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5])
+        yref = np.array([
+            self.drone_des_pos[0], self.drone_des_pos[1], self.drone_des_pos[2],
+            0.0, 0.0, 0.0,
+            0.0, 0.0, self.drone_des_orientation[2],
+            0.0, 0.0, 0.0,
+            0.5, 0.5, 0.5, 0.5
+        ])
         
         for i in range(self.ocp.solver_options.N_horizon):
             solver.set(i, 'yref', yref)
