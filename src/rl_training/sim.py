@@ -29,7 +29,7 @@ class CrazyflieEnv(gym.Env):
         obs_high = np.array([np.inf] * 13, dtype=np.float32)
         self.observation_space = spaces.Box(low=-obs_high, high=obs_high, dtype=np.float32)
 
-        self.target_position = np.array([0.5, -0.0, 1.5])  # cel do utrzymania
+        self.target_position = np.array([0.0, 0.0, 1.0])  # cel do utrzymania
         
         self.no_steps = 0
 
@@ -84,7 +84,7 @@ class CrazyflieEnv(gym.Env):
         
         pos_err = np.linalg.norm(obs[0:3] - self.target_position)
         
-        reward = -5.0 * quat_error - ang_vel_penalty - 10 * pos_err
+        reward = -5.0 * quat_error - ang_vel_penalty - 10 * pos_err - 10000 * self._check_termination(obs)
         
         return reward
 

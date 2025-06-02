@@ -41,6 +41,9 @@ RUN pip3 install --no-cache-dir \
     numpy==1.23.5 \
     scipy
 
+RUN pip install stable-baselines3[extra] \
+    pip install tensorboard
+
 # 📌 Budowa workspace ROS2
 RUN . /opt/ros/humble/setup.sh 
 

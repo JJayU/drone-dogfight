@@ -5,11 +5,15 @@ import time
 # Uruchamiamy środowisko z GUI
 env = CrazyflieEnv(render_mode="human")
 
+models_dir = "models/PPO"
+
 # Ładujemy model
-model = PPO.load("ppo_crazyflie", env=env)
+model = PPO.load(f"{models_dir}/2300000", env=env)
 
 # Reset środowiska
 obs, _ = env.reset()
+
+
 
 for _ in range(1000):
     action, _ = model.predict(obs, deterministic=True)
