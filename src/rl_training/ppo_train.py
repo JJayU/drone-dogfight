@@ -11,8 +11,8 @@ if not os.path.exists(models_dir):
 env = CrazyflieEnv(render_mode=None)
 env.reset()
 
-model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./logs/")
-# model = PPO.load(f"{models_dir}/800000", env, verbose=1, tensorboard_log="./logs/")   
+# model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./logs/")
+model = PPO.load(f"{models_dir}/2000000", env, verbose=1, tensorboard_log="./logs/")   
 
 TIMESTEPS = 100_000
 iters = 0

@@ -3,6 +3,7 @@ from gymnasium import spaces
 import mujoco
 import numpy as np
 import os
+from scipy.spatial.transform import Rotation as R
 
 
 class CrazyflieEnv(gym.Env):
@@ -22,16 +23,20 @@ class CrazyflieEnv(gym.Env):
             import mujoco_viewer
             self.viewer = mujoco_viewer.MujocoViewer(self.model, self.data)
 
-        # Actions: 4 silniki (0.0 - 1.0)
-        self.action_space = spaces.Box(low=0.0, high=1.0, shape=(4,), dtype=np.float32)
+        # Actions: collective thrust (0.0 - 1.0), body rates (roll, pitch, yaw) in rad/s
+        action_low = np.array([0.0, -5.0, -5.0, -5.0], dtype=np.float32)
+        action_high = np.array([1.0, 5.0, 5.0, 5.0], dtype=np.float32)
+        self.action_space = spaces.Box(low=action_low, high=action_high, dtype=np.float32)
 
-        # Observation: pos (3) + vel (3) + quat (4) + ang vel (3) = 13
-        obs_high = np.array([np.inf] * 13, dtype=np.float32)
+        # Observation: pos (3) + vel (3) + RPY (3) + ang vel (3) + local_dist (3) = 15
+        obs_high = np.array([np.inf] * 15, dtype=np.float32)
         self.observation_space = spaces.Box(low=-obs_high, high=obs_high, dtype=np.float32)
 
         self.target_position = np.array([0.0, 0.0, 1.0])  # cel do utrzymania
         
         self.no_steps = 0
+        
+        self.prev_dist_to_target = 0
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -42,6 +47,14 @@ class CrazyflieEnv(gym.Env):
         self.data.ctrl[:] = 0.0
         
         self.no_steps = 0
+        
+        self.target_position = np.array([
+            np.random.uniform(-1.0, 1.0),
+            np.random.uniform(-1.0, 1.0),
+            np.random.uniform(0.5, 2.0)
+        ])
+        
+        self.prev_dist_to_target = np.linalg.norm(self.data.qpos[0:3] - self.target_position)
 
         observation = self._get_obs()
         info = {}
@@ -49,6 +62,20 @@ class CrazyflieEnv(gym.Env):
 
     def step(self, action):
         self.data.ctrl[:] = np.clip(action, 0.0, 1.0)
+        
+        thrust = action[0]
+        roll_rate = action[1]
+        pitch_rate = action[2]
+        yaw_rate = action[3]
+        
+        m1 = thrust - roll_rate + pitch_rate - yaw_rate
+        m2 = thrust - roll_rate - pitch_rate + yaw_rate
+        m3 = thrust + roll_rate - pitch_rate - yaw_rate
+        m4 = thrust + roll_rate + pitch_rate + yaw_rate
+        
+        self.data.ctrl[:] = np.array([m1, m2, m3, m4], dtype=np.float32)
+        self.data.ctrl = np.clip(self.data.ctrl, 0.0, 1.0)
+        
         mujoco.mj_step(self.model, self.data)
         
         self.no_steps += 1
@@ -60,7 +87,19 @@ class CrazyflieEnv(gym.Env):
         if self.no_steps > 1000:
             truncated = True
         info = {}
-
+        
+        
+        # pos = self.data.qpos[0:3]
+        # if np.linalg.norm(pos - self.target_position) < 0.3:
+        #     reward += 100.0
+        #     self.target_position = np.array([
+        #         np.random.uniform(-1.0, 1.0),
+        #         np.random.uniform(-1.0, 1.0),
+        #         np.random.uniform(0.5, 2.0)
+        #     ])
+        
+        self.prev_dist_to_target = np.linalg.norm(self.data.qpos[0:3] - self.target_position)
+        
         if self.render_mode == "human" and self.viewer and self.viewer.is_alive:
             self.viewer.render()
 
@@ -71,7 +110,14 @@ class CrazyflieEnv(gym.Env):
         lin_vel = self.data.qvel[0:3]
         quat = self.data.qpos[3:7]
         ang_vel = self.data.qvel[3:6]
-        return np.concatenate([pos, lin_vel, quat, ang_vel]).astype(np.float32)
+        
+        rpy = R.from_quat(quat).as_euler('xyz', degrees=False)
+        
+        global_dist = self.target_position - pos
+        rot = R.from_quat(quat).as_matrix()
+        local_dist = rot.T @ global_dist
+        
+        return np.concatenate([pos, lin_vel, rpy, ang_vel, local_dist]).astype(np.float32)
 
     def _compute_reward(self, obs):
         target_quat = np.array([1, 0, 0, 0])
@@ -79,12 +125,19 @@ class CrazyflieEnv(gym.Env):
         
         quat_error = 1 - np.abs(np.dot(target_quat, current_quat))
         
+        target_rpt = np.array([0.0, 0.0, 0.0])
+        current_rpy = R.from_quat(current_quat).as_euler('xyz', degrees=False)
+        orientation_error = np.linalg.norm(target_rpt - current_rpy)
+        
         ang_vel = obs[10:13]
         ang_vel_penalty = 0.01 * np.linalg.norm(ang_vel)
         
         pos_err = np.linalg.norm(obs[0:3] - self.target_position)
         
-        reward = -5.0 * quat_error - ang_vel_penalty - 10 * pos_err - 10000 * self._check_termination(obs)
+        current_dist = np.linalg.norm(self.data.qpos[0:3] - self.target_position)
+        delta_dist = self.prev_dist_to_target - current_dist
+        
+        reward = -5.0 * orientation_error - ang_vel_penalty - 10 * pos_err + 2.0 * delta_dist - 10000 * self._check_termination(obs)
         
         return reward
 

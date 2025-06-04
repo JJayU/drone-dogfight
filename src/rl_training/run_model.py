@@ -8,14 +8,14 @@ env = CrazyflieEnv(render_mode="human")
 models_dir = "models/PPO"
 
 # Ładujemy model
-model = PPO.load(f"{models_dir}/2300000", env=env)
+model = PPO.load(f"{models_dir}/pos_hold_rpy", env=env)
 
 # Reset środowiska
 obs, _ = env.reset()
 
 
 
-for _ in range(1000):
+for _ in range(10000):
     action, _ = model.predict(obs, deterministic=True)
     obs, reward, terminated, truncated, info = env.step(action)
 
@@ -24,6 +24,8 @@ for _ in range(1000):
     
     # time.sleep(env.dt)  # żeby render nie był za szybki
     
-    print(obs[0:3])
+    # print(obs[0:3])
+    
+    print(obs[-3:])
 
 env.close()
