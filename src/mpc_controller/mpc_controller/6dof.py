@@ -134,38 +134,50 @@ class MPCControlNode(Node):
             msg.pose.orientation.w, msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z])
         self.drone_des_orientation = [r, p, y]
         
+    def angle_difference(self, target, current):
+        """
+        Returns the shortest difference between two angles (in radians), in range [-pi, pi].
+        """
+        diff = target - current
+        return (diff + np.pi) % (2 * np.pi) - np.pi    
+    
     def control_update(self):
-        
         solver = self.ocp_solver
-        
+
+        # Aktualny yaw drona
+        current_yaw = self.full_state[8]
+        # Zadany yaw
+        target_yaw = self.drone_des_orientation[2]
+        # Najkrótsza różnica kątowa
+        yaw_ref = current_yaw + self.angle_difference(target_yaw, current_yaw)
+
         # Update reference state
         yref = np.array([
             self.drone_des_pos[0], self.drone_des_pos[1], self.drone_des_pos[2],
             0.0, 0.0, 0.0,
-            0.0, 0.0, self.drone_des_orientation[2],
+            0.0, 0.0, yaw_ref,
             0.0, 0.0, 0.0,
             0.5, 0.5, 0.5, 0.5
         ])
-        
+
         for i in range(self.ocp.solver_options.N_horizon):
             solver.set(i, 'yref', yref)
-            
         solver.set(self.ocp.solver_options.N_horizon, 'yref', yref[:12])
-        
+
         # Update current state
         solver.set(0, "lbx", self.full_state)
         solver.set(0, "ubx", self.full_state)
 
         status = solver.solve()
-        
+
         if status != 0:
             raise Exception(f'acados returned status {status}.')
-        
+
         # Get computation time
         print(solver.get_stats('time_tot'))
-        
+
         u = solver.get(0, "u")
-        
+
         # Publish motor commands
         motor_commands = Float32MultiArray()
         motor_commands.data = [float(u[0]), float(u[1]), float(u[2]), float(u[3])]

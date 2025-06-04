@@ -2,16 +2,14 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PointStamped, PoseStamped
 from sensor_msgs.msg import Imu
-import numpy as np
 import time
-import sys
-import select
+import math
+import os
 
-class Experiment1Node(Node):
+class Experiment3Node(Node):
     def __init__(self):
-        super().__init__('experiments_node')
+        super().__init__('experiment3_node')
         
-        # Variables to store drone state
         self.drone_x = 0.0
         self.drone_y = 0.0
         self.drone_z = 0.0
@@ -19,122 +17,229 @@ class Experiment1Node(Node):
         self.drone_pitch = 0.0
         self.drone_yaw = 0.0
         
-        # Subscribers and publishers
-        self.gps_sub = self.create_subscription(
-            PointStamped,
-            'gps',
-            self.gps_callback,
-            10
-        )
-        self.imu_sub = self.create_subscription(
-            Imu,
-            'imu',
-            self.imu_callback,
-            10
-        )
-        self.drone_des_pos_pub = self.create_publisher(
-            PoseStamped,
-            'drone_des_pos',
-            10
-        )
+        self.gps_sub = self.create_subscription(PointStamped, 'gps', self.gps_callback, 10)
+        self.imu_sub = self.create_subscription(Imu, 'imu', self.imu_callback, 10)
+        self.drone_des_pos_pub = self.create_publisher(PoseStamped, 'drone_des_pos', 10)
         
         self.dt = 0.05
         self.timer = self.create_timer(self.dt, self.update)
         
-        self.start_time = time.time()
-        self.experiment_duration = 5.0 
+        self.experiment_duration = 30.0
+        self.hit_duration = 2.0
+        self.hit_threshold = 0.3
+        
+        # 16 stałych punktów z orientacją (x, y, z, yaw)
+        self.defined_targets = [
+            [1.0, 1.0, 1.5, 0.0],
+            [-1.0, 1.0, 1.0, 0.5],
+            [2.0, -1.5, 2.0, 1.0],
+            [-2.0, -1.5, 1.8, 1.5],
+            [0.0, 2.5, 1.0, -1.0],
+            [1.5, -2.5, 2.2, -0.5],
+            [-1.5, 2.0, 1.4, 0.8],
+            [2.5, 0.0, 1.9, 0.2],
+            [-2.5, 0.0, 2.1, -0.8],
+            [0.0, -2.5, 1.3, -1.2],
+            [2.2, 2.2, 2.0, 1.57],
+            [-2.2, -2.2, 1.2, -1.57],
+            [1.0, -1.0, 1.7, 3.14],
+            [-1.0, 0.0, 1.5, -3.14],
+            [0.0, 0.0, 2.0, 0.0],
+            [1.5, 1.5, 1.6, 0.3],
+        ]
+        self.current_target_index = 0
+        self.current_target = None
+        self.target_hit_start_time = None
+        self.is_hitting_target = False
+        
+        self.start_time = None
         self.experiment_started = False
         self.exp_no = 0
+        self.targets_hit = 0
+        self.total_targets = 0
         
-        print("\nExperiment 1 Node initialized.")
-        print("Press Enter to start the experiment.")
+        self.data_dir = "/home/ws/exp_data"
+        self.data_file = None
+        self.setup_data_logging()
         
+        print("\nExperiment 3 Node initialized - Static Target Challenge")
+        print("Drone has 30 seconds to hit as many fixed targets as possible")
+        print("Press Enter in terminal to start...")
+
+    def setup_data_logging(self):
+        """Setup data logging directory and file"""
+        if not os.path.exists(self.data_dir):
+            os.makedirs(self.data_dir)
+            print(f"Created data directory: {self.data_dir}")
+
+    def start_data_logging(self):
+        """Start logging data to file"""
+        filename = f"exp3_data_{self.exp_no}.txt"
+        self.data_file_path = os.path.join(self.data_dir, filename)
+        self.data_file = open(self.data_file_path, 'w')
+        
+        header = "time,targets_hit,total_targets,drone_x,drone_y,drone_z,drone_roll,drone_pitch,drone_yaw,target_x,target_y,target_z,distance_to_target,is_hitting\n"
+        self.data_file.write(header)
+        print(f"Started logging to: {self.data_file_path}")
+
+    def log_data(self, elapsed_time):
+        """Log current data to file"""
+        if self.data_file and self.current_target:
+            distance = self.calculate_distance_to_target()
+            is_hitting = 1 if self.is_hitting_target else 0
+            
+            data_line = f"{elapsed_time:.3f},{self.targets_hit},{self.total_targets}," \
+                       f"{self.drone_x:.3f},{self.drone_y:.3f},{self.drone_z:.3f}," \
+                       f"{self.drone_roll:.3f},{self.drone_pitch:.3f},{self.drone_yaw:.3f}," \
+                       f"{self.current_target[0]:.3f},{self.current_target[1]:.3f},{self.current_target[2]:.3f}," \
+                       f"{distance:.3f},{is_hitting}\n"
+            
+            self.data_file.write(data_line)
+
+    def stop_data_logging(self):
+        """Stop logging and close file"""
+        if self.data_file:
+            self.data_file.close()
+            self.data_file = None
+            print(f"Data saved to: {self.data_file_path}")
+
     def gps_callback(self, msg):
         self.drone_x = msg.point.x
         self.drone_y = msg.point.y
         self.drone_z = msg.point.z
         
     def imu_callback(self, msg):
-        orientation = msg.orientation
-        self.drone_roll, self.drone_pitch, self.drone_yaw = self.quaternion_to_euler(
-            [orientation.w, orientation.x, orientation.y, orientation.z]
-        )
-        
+        o = msg.orientation
+        self.drone_roll, self.drone_pitch, self.drone_yaw = self.quaternion_to_euler([o.w, o.x, o.y, o.z])
+
     def quaternion_to_euler(self, q):
         w, x, y, z = q
         sinr_cosp = 2 * (w * x + y * z)
-        cosr_cosp = 1 - 2 * (x * x + y * y)
-        roll = np.arctan2(sinr_cosp, cosr_cosp)
-        
+        cosr_cosp = 1 - 2 * (x**2 + y**2)
+        roll = math.atan2(sinr_cosp, cosr_cosp)
+
         sinp = 2 * (w * y - z * x)
-        pitch = np.arcsin(sinp)
-        
+        pitch = math.asin(sinp)
+
         siny_cosp = 2 * (w * z + x * y)
-        cosy_cosp = 1 - 2 * (y * y + z * z)
-        yaw = np.arctan2(siny_cosp, cosy_cosp)
-        
+        cosy_cosp = 1 - 2 * (y**2 + z**2)
+        yaw = math.atan2(siny_cosp, cosy_cosp)
+
         return roll, pitch, yaw
-        
-    def log_data(self):
-        # Log the data to a file
-        with open(f'/home/ws/exp_data/exp1_data_{self.exp_no}.txt', 'a') as f:
-            f.write(f"{time.time() - self.start_time}, {self.drone_x}, {self.drone_y}, {self.drone_z}, {self.drone_roll}, {self.drone_pitch}, {self.drone_yaw}\n")
-            
-            
+
+    def euler_to_quaternion(self, roll, pitch, yaw):
+        cy = math.cos(yaw * 0.5)
+        sy = math.sin(yaw * 0.5)
+        cp = math.cos(pitch * 0.5)
+        sp = math.sin(pitch * 0.5)
+        cr = math.cos(roll * 0.5)
+        sr = math.sin(roll * 0.5)
+
+        w = cr * cp * cy + sr * sp * sy
+        x = sr * cp * cy - cr * sp * sy
+        y = cr * sp * cy + sr * cp * sy
+        z = cr * cp * sy - sr * sp * cy
+        return [w, x, y, z]
+
+    def next_target(self):
+        if self.current_target_index >= len(self.defined_targets):
+            self.current_target_index = 0
+        target = self.defined_targets[self.current_target_index]
+        self.current_target_index += 1
+        self.total_targets += 1
+        print(f"New target: {target} (Total: {self.total_targets})")
+        return target
+
+    def calculate_distance_to_target(self):
+        if self.current_target is None:
+            return float('inf')
+        dx = self.drone_x - self.current_target[0]
+        dy = self.drone_y - self.current_target[1]
+        dz = self.drone_z - self.current_target[2]
+        return math.sqrt(dx**2 + dy**2 + dz**2)
+
+    def check_target_hit(self):
+        distance = self.calculate_distance_to_target()
+        now = time.time()
+        if distance <= self.hit_threshold:
+            if not self.is_hitting_target:
+                self.is_hitting_target = True
+                self.target_hit_start_time = now
+                print(f"Targeting... (distance: {distance:.2f}m)")
+            elif now - self.target_hit_start_time >= self.hit_duration:
+                self.targets_hit += 1
+                print(f"TARGET HIT! Total: {self.targets_hit}")
+                self.current_target = self.next_target()
+                self.is_hitting_target = False
+        else:
+            if self.is_hitting_target:
+                print(f"Lost target (distance: {distance:.2f}m)")
+                self.is_hitting_target = False
+
     def update(self):
-        
-        # Create a PoseStamped message for the desired position
         desired_pos = PoseStamped()
         desired_pos.header.stamp = self.get_clock().now().to_msg()
         desired_pos.header.frame_id = 'map'
+
+        if not self.experiment_started:
+            if self.start_time is None:
+                print("Waiting for Enter...")
+                try:
+                    input()
+                    self.experiment_started = True
+                    self.start_time = time.time()
+                    self.exp_no += 1
+                    self.targets_hit = 0
+                    self.total_targets = 0
+                    self.current_target = self.next_target()
+                    self.start_data_logging()
+                    print(f"Experiment {self.exp_no} started.")
+                except EOFError:
+                    pass
+            return
+
+        elapsed = time.time() - self.start_time
+        if elapsed >= self.experiment_duration:
+            print(f"\nExperiment complete.")
+            print(f"Targets hit: {self.targets_hit}")
+            print(f"Total targets: {self.total_targets}")
+            if self.total_targets > 0:
+                success_rate = (self.targets_hit / self.total_targets) * 100
+                print(f"Success rate: {success_rate:.1f}%")
+            print("Press Enter to restart.")
+            
+            self.stop_data_logging()
+            self.experiment_started = False
+            self.start_time = None
+            return
+
+        self.check_target_hit()
         
-        # Check if Enter is pressed to start the experiment
-        if sys.stdin in select.select([sys.stdin], [], [], 0)[0] and not self.experiment_started:
-            line = sys.stdin.readline()
-            if line == '\n':
-                self.experiment_started = True
-                self.start_time = time.time()
-                self.exp_no += 1
-                print(f"Experiment no. {self.exp_no} started!")
-        
-        if self.experiment_started:
-            self.log_data()
-            
-            # Experiment logic
-            desired_pos.pose.position.x = 0.0
-            desired_pos.pose.position.y = 0.0
-            desired_pos.pose.position.z = 1.5
-            desired_pos.pose.orientation.x = 0.0
-            desired_pos.pose.orientation.y = 0.0
-            desired_pos.pose.orientation.z = 0.0
-            desired_pos.pose.orientation.w = 1.0
-            
-            # Check if the experiment duration has passed
-            if time.time() - self.start_time > self.experiment_duration:
-                print("Experiment finished!")
-                print("Press Enter to start again.")
-                self.experiment_started = False
-            
-        else:
-            # Standby position
-            desired_pos.pose.position.x = 0.0
-            desired_pos.pose.position.y = 0.0
-            desired_pos.pose.position.z = 0.2
-            desired_pos.pose.orientation.x = 0.0
-            desired_pos.pose.orientation.y = 0.0
-            desired_pos.pose.orientation.z = 0.0
-            desired_pos.pose.orientation.w = 1.0
-            
-        # Publish the desired position
+        self.log_data(elapsed)
+
+        desired_pos.pose.position.x = self.current_target[0]
+        desired_pos.pose.position.y = self.current_target[1]
+        desired_pos.pose.position.z = self.current_target[2]
+
+        q = self.euler_to_quaternion(0, 0, self.current_target[3])
+        desired_pos.pose.orientation.w = q[0]
+        desired_pos.pose.orientation.x = q[1]
+        desired_pos.pose.orientation.y = q[2]
+        desired_pos.pose.orientation.z = q[3]
+
         self.drone_des_pos_pub.publish(desired_pos)
-        
-        
+
 def main():
     rclpy.init()
-    node = Experiment1Node()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    node = Experiment3Node()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        print("\nShutting down...")
+    finally:
+        node.stop_data_logging()  
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
