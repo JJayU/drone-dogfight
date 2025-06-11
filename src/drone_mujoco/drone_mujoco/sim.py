@@ -8,6 +8,11 @@ from sensor_msgs.msg import Imu
 from ament_index_python.packages import get_package_share_directory
 import time
 
+# Simulation Node for Drone in Mujoco
+# This node initializes a Mujoco simulation environment, subscribes to motor commands,
+# and publishes the drone's state including GPS and IMU data.
+# It can optionally use a GUI for visualization.
+
 class SimNode(Node):
     def __init__(self, use_gui=False):
         super().__init__('sim_node')
@@ -24,6 +29,7 @@ class SimNode(Node):
         else:
             self.viewer = None
         
+        # Simulation timestep
         self.model.opt.timestep = 0.005
         self.create_timer(self.model.opt.timestep, self.loop)
         self.running = True
@@ -40,9 +46,9 @@ class SimNode(Node):
 
         self.gps_publisher = self.create_publisher(PointStamped, 'gps', 10)
         self.imu_publisher = self.create_publisher(Imu, 'imu', 10)
-        
         self.full_state_publisher = self.create_publisher(Float32MultiArray, 'full_state', 10)
 
+    # Callback for motor commands
     def motor_listener_callback(self, msg):
         if len(msg.data) == 4:
             self.set_control(msg.data)
@@ -68,6 +74,7 @@ class SimNode(Node):
         
         return roll, pitch, yaw
 
+    # Publish the drone's state including GPS and IMU data
     def publish_state(self):
         x, y, z = self.data.qpos[0:3]
 
@@ -89,18 +96,18 @@ class SimNode(Node):
         self.imu_publisher.publish(imu_msg)
         
         full_state_msg = Float32MultiArray()
+        
         position = self.data.qpos[0:3]
         speed = self.data.qvel[0:3]
         orientation = self.data.qpos[3:7]
-        # Convert quaternion to Euler angles
         euler_angles = self.quaternion_to_euler(orientation)
-        # Calculate angular velocity in roll, pitch, yaw (RPY) space
         angular_velocity = self.data.qvel[3:6]
         # Combine position, speed, orientation, and angular velocity into a single observation vector
         observation = np.concatenate([position, speed, euler_angles, angular_velocity])
         full_state_msg.data = observation.tolist()
         self.full_state_publisher.publish(full_state_msg)
 
+    # Main loop for the simulation
     def loop(self):
         mujoco.mj_step(self.model, self.data)
         
@@ -113,6 +120,7 @@ class SimNode(Node):
             self.running = False
             self.destroy_node()
             
+        # Uncomment the following line to set a fixed position for testing
         # self.data.qpos[0:3] = [0, 0, 1]
 
         self.publish_state()
