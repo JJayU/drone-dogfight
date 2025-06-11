@@ -3,7 +3,9 @@ build/
 install/
 log/
 .vscode/
+c_generated_code/
 
 # Pliki tymczasowe
 *.pyc
 __pycache__/
+acados_ocp.json

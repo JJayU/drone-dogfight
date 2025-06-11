@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import PointStamped, PoseStamped
 from sensor_msgs.msg import Imu
 import numpy as np
 import time
@@ -63,8 +63,8 @@ class ControlNode(Node):
             10
         )
         self.target_sub = self.create_subscription(
-            PointStamped,
-            'target_point',
+            PoseStamped,
+            'drone_des_pos',
             self.target_callback,
             10
         )
@@ -75,17 +75,7 @@ class ControlNode(Node):
             10
         )
         
-        # More conservative but steadier
-        # self.x_pos_pid  = PID(kp=0.20, ki=0.0, kd=0.05, setpoint=0.0, name="X Position")
-        # self.y_pos_pid  = PID(kp=0.20, ki=0.0, kd=0.05, setpoint=0.0, name="Y Position")
-
-        # self.roll_pid   = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0, name="Roll")
-        # self.pitch_pid  = PID(kp=0.05, ki=0.0, kd=0.01, setpoint=0.0, name="Pitch")
-        # self.yaw_pid    = PID(kp=0.01, ki=0.0, kd=0.01, setpoint=0.0, name="Yaw")
-
-        # self.height_pid = PID(kp=1.00, ki=0.5, kd=0.50, setpoint=1.0, name="Height")
-        
-        # More aggresive but a little bit unstable
+        # PID controllers
         self.x_pos_pid  = PID(kp=0.521558, ki=0.086138, kd=0.252982, setpoint=0.0, name="X Position")
         self.y_pos_pid  = PID(kp=0.662796, ki=0.088061, kd=0.375998, setpoint=0.0, name="Y Position")
 
@@ -100,9 +90,8 @@ class ControlNode(Node):
         
         self.last_time = 0.0
         
-        self.target = [0., 0., 0.]
-        
-        self.angle = 0.
+        self.target_pos = [0., 0., 0.]
+        self.target_yaw = 0.0
         
     def gps_callback(self, msg):
         self.x = msg.point.x
@@ -121,7 +110,15 @@ class ControlNode(Node):
         self.roll, self.pitch, self.yaw = self.quaternion_to_euler(q)
         
     def target_callback(self, msg):
-        self.target = [msg.point.x, msg.point.y, msg.point.z]
+        self.target_pos = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
+        
+        target_q = [
+            msg.pose.orientation.w,
+            msg.pose.orientation.x,
+            msg.pose.orientation.y,
+            msg.pose.orientation.z
+        ]
+        _, _, self.target_yaw = self.quaternion_to_euler(target_q)
         
     def quaternion_to_euler(self, q):
         w, x, y, z = q
@@ -142,17 +139,11 @@ class ControlNode(Node):
         
         if(time.time() - self.last_time < 1):
             
-            self.angle += 0.001
+            self.x_pos_pid.setpoint = self.target_pos[0]
+            self.y_pos_pid.setpoint = self.target_pos[1]
+            self.height_pid.setpoint = self.target_pos[2]
             
-            target_x = np.sin(self.angle)
-            target_y = np.cos(self.angle)
-            
-            self.x_pos_pid.setpoint = target_x
-            self.y_pos_pid.setpoint = target_y 
-            
-            target_yaw = np.arctan2(self.target[1] - self.y, self.target[0] - self.x)
-            
-            self.height_pid.setpoint = self.target[2] - 0.02
+            self.yaw_pid.setpoint = self.target_yaw
         
             desired_pitch = self.x_pos_pid.update(self.x, self.dt)
             desired_roll = self.y_pos_pid.update(self.y, self.dt)
@@ -162,7 +153,6 @@ class ControlNode(Node):
             
             self.pitch_pid.setpoint = desired_pitch * np.cos(self.yaw) - desired_roll * np.sin(-self.yaw)
             self.roll_pid.setpoint = - desired_roll * np.cos(-self.yaw) + desired_pitch * np.sin(self.yaw)
-            self.yaw_pid.setpoint = target_yaw
             
             height_control = self.height_pid.update(self.z, self.dt)
             pitch_control = self.pitch_pid.update(self.pitch, self.dt)
