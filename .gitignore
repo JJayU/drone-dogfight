@@ -4,6 +4,7 @@ install/
 log/
 .vscode/
 c_generated_code/
+exp*_data*
 
 # Pliki tymczasowe
 *.pyc
