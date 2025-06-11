@@ -172,7 +172,7 @@ class ControlNode(Node):
                 m4 /= max_thrust
             
             motor_commands = Float32MultiArray()
-            motor_commands.data = [float(m1), float(m2), float(m3), float(m4)]
+            motor_commands.data = [float(m1), float(m2), float(m3), float(m4)]      
             self.motor_pub.publish(motor_commands)
         
 def main():
