@@ -135,8 +135,7 @@ class CrazyflieEnv(gym.Env):
         reward = self._compute_reward(obs)
         terminated = bool(self._check_termination(obs))
         
-        # Truncate after reasonable number of steps (30 seconds at 30 Hz)
-        truncated = self.no_steps > 6000
+        truncated = self.no_steps > 12000
         info = {}
         
         # Check if target reached
@@ -230,30 +229,22 @@ class CrazyflieEnv(gym.Env):
         # Yaw error
         yaw_error = self._wrap_angle(self.target_yaw - current_yaw)
         
-        # ZWIĘKSZONE kary za prędkość (z 0.01 na 0.05)
-        lin_vel_penalty = 0.05 * np.linalg.norm(lin_vel)  # 5x większa
-        ang_vel_penalty = 0.05 * np.linalg.norm(ang_vel)  # 5x większa
+        # Velocity penalties
+        lin_vel_penalty = 0.01 * np.linalg.norm(lin_vel)
+        ang_vel_penalty = 0.01 * np.linalg.norm(ang_vel)
         
-        # DODATKOWA kara za nadmierną prędkość gdy blisko celu
-        excessive_speed_penalty = 0.0
-        if pos_error < 0.1:  # Gdy blisko celu
-            speed = np.linalg.norm(lin_vel)
-            if speed > 1.0:  # Jeśli za szybko
-                excessive_speed_penalty = 60.0 * (speed)
-        
-        # Distance change reward - ZMNIEJSZONE (z 5.0 na 3.0)
+        # Distance change reward
         current_dist = np.linalg.norm(pos - self.target_position)
         delta_dist = self.prev_dist_to_target - current_dist
         
         # Composite reward function
         reward = (
-            -5.0 * pos_error +           # bez zmian
-            -5.0 * roll_pitch_error +    # bez zmian
-            -5.0 * abs(yaw_error) +      # bez zmian
-            -lin_vel_penalty +           # zwiększona z 0.01 na 0.05
-            -ang_vel_penalty +           # zwiększona z 0.01 na 0.05
-            -excessive_speed_penalty +   # NOWA kara za nadmierną prędkość
-            3.0 * delta_dist             # zmniejszona z 5.0 na 3.0
+            -6.0 * pos_error +           # main penalty for distance from target
+            -5.0 * roll_pitch_error +     # penalty for deviation from level
+            -5.0 * abs(yaw_error) +       # penalty for yaw error
+            -lin_vel_penalty +            # penalty for excessive linear velocity
+            -3*ang_vel_penalty +            # penalty for excessive angular velocity
+            2.0 * delta_dist              # reward for approaching target
         )
         
         # Large penalty for termination
@@ -261,6 +252,7 @@ class CrazyflieEnv(gym.Env):
             reward -= 1000.0
         
         return reward
+
     
     def _check_termination(self, obs):
         x, y, z = obs[0:3]

@@ -33,7 +33,7 @@ ppo_config = {
 }
 
 # --- Wczytaj lub stwórz model ---
-load_path = f"{models_dir}/zmiejszeniev2"
+load_path = f"{models_dir}/calkiem_osemkav1"
 if os.path.exists(load_path + ".zip"):
     print(f"Loading model from {load_path}")
     model = PPO.load(load_path, env=env, tensorboard_log=logdir)

@@ -304,7 +304,7 @@ class RLExperiment:
 def main():
     # Configuration
     models_dir = "models/PPO"
-    model_path = f"{models_dir}/100000"
+    model_path = f"{models_dir}/zmiejszeniev2"  # Path to the model file (without .zip)
     
     # Check if model exists
     if not os.path.exists(model_path + ".zip"):
