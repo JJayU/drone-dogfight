@@ -7,11 +7,11 @@ import os
 
 class RLExperiment5:
     def __init__(self, model_path):
-        self.env = CrazyflieEnv(render_mode="human")
+        self.env = CrazyflieEnv()
         self.model = PPO.load(model_path, env=self.env)
         
-        # Experiment parameters (step-based for 200Hz simulation)
-        self.experiment_steps = 4000  # 12000 steps (60 seconds at 200Hz)
+        # Experiment parameters (step-based for 50Hz simulation)render_mode="human"
+        self.experiment_steps = 3000  # 3000 steps (60 seconds at 50Hz)
         
         # Target trajectory parameters
         self.target_center_x = 0.0 
@@ -64,7 +64,7 @@ class RLExperiment5:
     def log_data(self, step, obs, desired_pos, action):
         """Log current data to file including motor powers and cumulative energy"""
         if self.data_file:
-            time_elapsed = step / 50.0  # Convert steps to seconds
+            time_elapsed = step / 50.0  # Convert steps to seconds (50Hz)
             drone_pos = obs[0:3]
             drone_rpy = obs[6:9]
             
@@ -81,7 +81,7 @@ class RLExperiment5:
             
             # Extract motor powers from environment
             if hasattr(self.env, 'data') and hasattr(self.env.data, 'ctrl'):
-                motor_powers = self.env.data.ctrl[:4]  # Get actual motor commands from MuJoCo
+                motor_powers = self.env.data.ctrl[:4]# Get actual motor commands from MuJoCo
             else:
                 # Fallback: use action if it represents motor powers
                 motor_powers = action[:4] if len(action) >= 4 else [0.0, 0.0, 0.0, 0.0]
@@ -127,7 +127,7 @@ class RLExperiment5:
         target_z = self.target_base_height + height_variation
 
         # Calculate direction angle
-        dt = 1/50
+        dt = 1/50  # Updated for 50Hz
         t_next = t + dt
         next_x = self.target_center_x + scale * np.sin(t_next)
         next_y = self.target_center_y + scale * np.sin(2 * t_next) / 2
@@ -156,11 +156,11 @@ class RLExperiment5:
     def run_experiment(self):
         """Run the complete experiment"""
         print("\n" + "="*60)
-        print("RL Model Experiment 5 - Target Following (200Hz)")
+        print("RL Model Experiment 5 - Target Following (50Hz)")
         print("="*60)
         print("Cel porusza się po trajektorii ósemki z pionową falą")
         print("Dron śledzi cel i utrzymuje pozycję za nim, celując w jego tył")
-        print(f"Duration: {self.experiment_steps} steps ({self.experiment_steps/50:.1f} seconds at 200Hz)")
+        print(f"Duration: {self.experiment_steps} steps ({self.experiment_steps/50:.1f} seconds at 50Hz)")
         print("="*60)
         print("Naciśnij Enter, aby rozpocząć eksperyment...")
         input()
@@ -180,7 +180,7 @@ class RLExperiment5:
         
         while self.current_step < self.experiment_steps:
             # Calculate current time
-            elapsed_time = self.current_step / 50
+            elapsed_time = self.current_step / 50  # Updated for 50Hz
             
             # Update target position
             self.target_x, self.target_y, self.target_z, self.target_direction_angle = \
@@ -199,8 +199,8 @@ class RLExperiment5:
             action, _ = self.model.predict(obs, deterministic=True)
             obs, reward, terminated, truncated, info = self.env.step(action)
             
-            # Log data every 10 steps (every 0.05s at 200Hz) - now includes action for motor powers
-            if self.current_step % 10 == 0:
+            # Log data every 5 steps (every 0.1s at 50Hz)
+            if self.current_step % 5 == 0:
                 desired_pos = [desired_x, desired_y, desired_z, desired_yaw]
                 self.log_data(self.current_step, obs, desired_pos, action)
             
@@ -209,7 +209,7 @@ class RLExperiment5:
                 print(f"Environment reset at step {self.current_step}")
                 obs, _ = self.env.reset()
             
-            # Print status every 400 steps (every 2 seconds at 200Hz)
+            # Print status every 100 steps (every 2 seconds at 50Hz)
             if self.current_step - last_status_step >= 100:
                 distance_to_target = math.sqrt(
                     (drone_pos[0] - self.target_x)**2 + 
@@ -222,7 +222,7 @@ class RLExperiment5:
                 aiming_error = abs(self._wrap_angle(drone_yaw - target_bearing))
                 
                 remaining_steps = self.experiment_steps - self.current_step
-                remaining_time = remaining_steps /50.0
+                remaining_time = remaining_steps / 50.0  # Updated for 50Hz
                 
                 print(f"Time: {elapsed_time:.1f}s (remaining: {remaining_time:.1f}s) | "
                       f"Drone: [{drone_pos[0]:.2f}, {drone_pos[1]:.2f}, {drone_pos[2]:.2f}] | "
@@ -238,7 +238,7 @@ class RLExperiment5:
         print("\n" + "="*60)
         print("[Koniec] Eksperyment zakończony!")
         print("="*60)
-        print(f"Total time: {self.current_step/50.0:.1f} seconds")
+        print(f"Total time: {self.current_step/50.0:.1f} seconds")  # Updated for 50Hz
         print("Cel poruszał się po ósemce, dron śledził go z tyłu.")
         
         # Analyze power consumption
@@ -265,10 +265,10 @@ class RLExperiment5:
         
         obs, _ = self.env.reset()  # Reset to ensure clean state
         
-        # Run for a few steps to reach home (1000 steps = 5 seconds at 200Hz)
+        # Run for a few steps to reach home (250 steps = 5 seconds at 50Hz)
         home_steps = 0
         print("Powrót do domu...")
-        while home_steps < 1000:
+        while home_steps < 250:  # Updated for 50Hz
             action, _ = self.model.predict(obs, deterministic=True)
             obs, reward, terminated, truncated, info = self.env.step(action)
             
@@ -296,7 +296,7 @@ class RLExperiment5:
     def analyze_power_consumption(self):
         """Analyze power consumption from the experiment"""
         if hasattr(self, 'cumulative_energy'):
-            total_time = self.current_step / 50.0
+            total_time = self.current_step / 50.0  # Updated for 50Hz
             average_power = self.cumulative_energy / self.current_step if self.current_step > 0 else 0
             
             print(f"\nPower Consumption Analysis:")

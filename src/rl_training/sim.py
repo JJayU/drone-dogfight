@@ -116,6 +116,7 @@ class CrazyflieEnv(gym.Env):
         m4 = thrust + k_mix * (roll_rate + pitch_rate + yaw_rate)   # front-left
         
         # Clip motor commands
+        
         motor_commands = np.array([m1, m2, m3, m4], dtype=np.float32)
         motor_commands = np.clip(motor_commands, 0.0, 1.0)
         print(f"Motor commands: {motor_commands}")
