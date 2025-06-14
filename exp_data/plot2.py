@@ -75,7 +75,7 @@ def plot_experiment_5_data(file_path, save_path=None):
     plt.axhline(y=np.degrees(np.mean(aiming_error)), color='purple', linestyle='--', alpha=0.7, 
                 label=f'Mean: {np.degrees(np.mean(aiming_error)):.2f}°')
     # Add threshold line for "good aiming"
-    plt.axhline(y=5.7, color='red', linestyle=':', alpha=0.7, label='Threshold: 5.7°')
+    plt.axhline(y=1, color='red', linestyle=':', alpha=0.7, label='Threshold: 1.0°')
     plt.title("Aiming Error (Yaw) Over Time")
     plt.xlabel("Time [s]")
     plt.ylabel("Aiming Error [deg]")
@@ -196,7 +196,7 @@ def plot_experiment_5_data(file_path, save_path=None):
     
     # Laser hit analysis
     dt = np.mean(np.diff(time))
-    aiming_threshold_rad = np.radians(5.7) 
+    aiming_threshold_rad = np.radians(1.0) 
     accurate_shots = aiming_error < aiming_threshold_rad
     hit_count = np.sum(accurate_shots)
     hit_time_total = hit_count * dt
