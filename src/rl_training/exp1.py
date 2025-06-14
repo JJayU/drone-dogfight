@@ -11,11 +11,11 @@ class RLExperiment:
         self.model = PPO.load(model_path, env=self.env)
         
         # Experiment parameters (now step-based for 200Hz simulation) render_mode="human"
-        self.experiment_steps = 6000  # 6000 steps (30 seconds at 200Hz)
-        self.hit_duration_steps = 400  # 400 steps to hold position (2 seconds at 200Hz)
+        self.experiment_steps = 2100  # 6000 steps (30 seconds at 200Hz)
+        self.hit_duration_steps = 140  # 400 steps to hold position (2 seconds at 200Hz)
         self.hit_threshold = 0.3      # 0.3m distance threshold
         self.yaw_threshold = 0.1      # ~5.7 degrees tolerance for yaw
-        self.simulation_frequency = 200.0  # Hz
+        self.simulation_frequency = 70.0  # Hz
         
         # 16 static targets with orientation (x, y, z, yaw)
         self.defined_targets = [

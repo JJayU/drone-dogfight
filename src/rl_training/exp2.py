@@ -7,11 +7,11 @@ import os
 
 class RLExperiment5:
     def __init__(self, model_path):
-        self.env = CrazyflieEnv()
+        self.env = CrazyflieEnv(render_mode="human")
         self.model = PPO.load(model_path, env=self.env)
         
-        # Experiment parameters (step-based for 200Hz simulation)render_mode="human"
-        self.experiment_steps = 12000  # 12000 steps (60 seconds at 200Hz)
+        # Experiment parameters (step-based for 200Hz simulation)
+        self.experiment_steps = 4000  # 12000 steps (60 seconds at 200Hz)
         
         # Target trajectory parameters
         self.target_center_x = 0.0 
@@ -49,20 +49,22 @@ class RLExperiment5:
 
     def start_data_logging(self):
         """Start logging data to file"""
-        filename = f"rl_exp5_data_{self.exp_no}.txt"
+        filename = f"exp5_data_{self.exp_no}.txt"
         self.data_file_path = os.path.join(self.data_dir, filename)
-        self.data_file = open(self.data_file_path, 'w')
         
-        header = "time,drone_x,drone_y,drone_z,drone_roll,drone_pitch,drone_yaw," \
-                "target_x,target_y,target_z,target_direction,distance_to_target," \
-                "aiming_error,desired_x,desired_y,desired_z,desired_yaw\n"
-        self.data_file.write(header)
+        with open(f'/home/ws/exp_data/exp5_data_{self.exp_no}.txt', 'w') as f:
+            f.write("time, drone_x, drone_y, drone_z, drone_roll, drone_pitch, drone_yaw, "
+                    "target_x, target_y, target_z, target_direction, distance_to_target, "
+                    "aiming_error, m1_power, m2_power, m3_power, m4_power, cumulative_energy\n")
+    
+        # Open file for continuous writing
+        self.data_file = open(self.data_file_path, 'a')
         print(f"Started logging to: {self.data_file_path}")
 
-    def log_data(self, step, obs, desired_pos):
-        """Log current data to file"""
+    def log_data(self, step, obs, desired_pos, action):
+        """Log current data to file including motor powers and cumulative energy"""
         if self.data_file:
-            time_elapsed = step / 200.0  # Convert steps to seconds
+            time_elapsed = step / 50.0  # Convert steps to seconds
             drone_pos = obs[0:3]
             drone_rpy = obs[6:9]
             
@@ -77,15 +79,32 @@ class RLExperiment5:
             target_bearing = math.atan2(self.target_y - drone_pos[1], self.target_x - drone_pos[0])
             aiming_error = abs(self._wrap_angle(drone_rpy[2] - target_bearing))
             
-            data_line = f"{time_elapsed:.3f}," \
-                       f"{drone_pos[0]:.3f},{drone_pos[1]:.3f},{drone_pos[2]:.3f}," \
-                       f"{drone_rpy[0]:.3f},{drone_rpy[1]:.3f},{drone_rpy[2]:.3f}," \
-                       f"{self.target_x:.3f},{self.target_y:.3f},{self.target_z:.3f}," \
-                       f"{self.target_direction_angle:.3f},{distance_to_target:.3f}," \
-                       f"{aiming_error:.3f}," \
-                       f"{desired_pos[0]:.3f},{desired_pos[1]:.3f},{desired_pos[2]:.3f},{desired_pos[3]:.3f}\n"
+            # Extract motor powers from environment
+            if hasattr(self.env, 'data') and hasattr(self.env.data, 'ctrl'):
+                motor_powers = self.env.data.ctrl[:4]  # Get actual motor commands from MuJoCo
+            else:
+                # Fallback: use action if it represents motor powers
+                motor_powers = action[:4] if len(action) >= 4 else [0.0, 0.0, 0.0, 0.0]
+            
+            # Simple cumulative energy - sum of all motor powers
+            if not hasattr(self, 'cumulative_energy'):
+                self.cumulative_energy = 0.0
+            
+            # Add current motor powers to cumulative sum
+            current_total_power = sum(motor_powers)
+            self.cumulative_energy += current_total_power
+            
+            data_line = f"{time_elapsed:.3f}, " \
+                       f"{drone_pos[0]:.3f}, {drone_pos[1]:.3f}, {drone_pos[2]:.3f}, " \
+                       f"{drone_rpy[0]:.3f}, {drone_rpy[1]:.3f}, {drone_rpy[2]:.3f}, " \
+                       f"{self.target_x:.3f}, {self.target_y:.3f}, {self.target_z:.3f}, " \
+                       f"{self.target_direction_angle:.3f}, {distance_to_target:.3f}, " \
+                       f"{aiming_error:.3f}, " \
+                       f"{motor_powers[0]:.3f}, {motor_powers[1]:.3f}, {motor_powers[2]:.3f}, {motor_powers[3]:.3f}, " \
+                       f"{self.cumulative_energy:.3f}\n"
             
             self.data_file.write(data_line)
+            self.data_file.flush()  # Ensure data is written immediately
 
     def stop_data_logging(self):
         """Stop logging and close file"""
@@ -108,7 +127,7 @@ class RLExperiment5:
         target_z = self.target_base_height + height_variation
 
         # Calculate direction angle
-        dt = 0.01
+        dt = 1/50
         t_next = t + dt
         next_x = self.target_center_x + scale * np.sin(t_next)
         next_y = self.target_center_y + scale * np.sin(2 * t_next) / 2
@@ -141,7 +160,7 @@ class RLExperiment5:
         print("="*60)
         print("Cel porusza się po trajektorii ósemki z pionową falą")
         print("Dron śledzi cel i utrzymuje pozycję za nim, celując w jego tył")
-        print(f"Duration: {self.experiment_steps} steps ({self.experiment_steps/200:.1f} seconds at 200Hz)")
+        print(f"Duration: {self.experiment_steps} steps ({self.experiment_steps/50:.1f} seconds at 200Hz)")
         print("="*60)
         print("Naciśnij Enter, aby rozpocząć eksperyment...")
         input()
@@ -149,6 +168,7 @@ class RLExperiment5:
         # Initialize experiment
         self.exp_no += 1
         self.current_step = 0
+        self.cumulative_energy = 0.0  # Reset cumulative energy
         self.start_data_logging()
         
         # Reset environment
@@ -160,7 +180,7 @@ class RLExperiment5:
         
         while self.current_step < self.experiment_steps:
             # Calculate current time
-            elapsed_time = self.current_step / 200.0
+            elapsed_time = self.current_step / 50
             
             # Update target position
             self.target_x, self.target_y, self.target_z, self.target_direction_angle = \
@@ -179,10 +199,10 @@ class RLExperiment5:
             action, _ = self.model.predict(obs, deterministic=True)
             obs, reward, terminated, truncated, info = self.env.step(action)
             
-            # Log data every 10 steps (every 0.05s at 200Hz)
+            # Log data every 10 steps (every 0.05s at 200Hz) - now includes action for motor powers
             if self.current_step % 10 == 0:
                 desired_pos = [desired_x, desired_y, desired_z, desired_yaw]
-                self.log_data(self.current_step, obs, desired_pos)
+                self.log_data(self.current_step, obs, desired_pos, action)
             
             # Reset if terminated/truncated
             if terminated or truncated:
@@ -190,7 +210,7 @@ class RLExperiment5:
                 obs, _ = self.env.reset()
             
             # Print status every 400 steps (every 2 seconds at 200Hz)
-            if self.current_step - last_status_step >= 400:
+            if self.current_step - last_status_step >= 100:
                 distance_to_target = math.sqrt(
                     (drone_pos[0] - self.target_x)**2 + 
                     (drone_pos[1] - self.target_y)**2 + 
@@ -202,7 +222,7 @@ class RLExperiment5:
                 aiming_error = abs(self._wrap_angle(drone_yaw - target_bearing))
                 
                 remaining_steps = self.experiment_steps - self.current_step
-                remaining_time = remaining_steps / 200.0
+                remaining_time = remaining_steps /50.0
                 
                 print(f"Time: {elapsed_time:.1f}s (remaining: {remaining_time:.1f}s) | "
                       f"Drone: [{drone_pos[0]:.2f}, {drone_pos[1]:.2f}, {drone_pos[2]:.2f}] | "
@@ -218,8 +238,15 @@ class RLExperiment5:
         print("\n" + "="*60)
         print("[Koniec] Eksperyment zakończony!")
         print("="*60)
-        print(f"Total time: {self.current_step/200.0:.1f} seconds")
+        print(f"Total time: {self.current_step/50.0:.1f} seconds")
         print("Cel poruszał się po ósemce, dron śledził go z tyłu.")
+        
+        # Analyze power consumption
+        power_stats = self.analyze_power_consumption()
+        if power_stats:
+            print(f"Total power consumption: {power_stats['total_energy']:.3f}")
+            print(f"Average power per step: {power_stats['average_power_per_step']:.3f}")
+
         print("="*60)
         
         self.stop_data_logging()
@@ -265,6 +292,24 @@ class RLExperiment5:
         """Clean up resources"""
         self.stop_data_logging()
         self.env.close()
+
+    def analyze_power_consumption(self):
+        """Analyze power consumption from the experiment"""
+        if hasattr(self, 'cumulative_energy'):
+            total_time = self.current_step / 50.0
+            average_power = self.cumulative_energy / self.current_step if self.current_step > 0 else 0
+            
+            print(f"\nPower Consumption Analysis:")
+            print(f"Total cumulative energy: {self.cumulative_energy:.3f}")
+            print(f"Average power per step: {average_power:.3f}")
+            print(f"Power consumption rate: {self.cumulative_energy / total_time:.3f} per second" if total_time > 0 else "N/A")
+            
+            return {
+                'total_energy': self.cumulative_energy,
+                'average_power_per_step': average_power,
+                'total_time': total_time
+            }
+        return None
 
 
 def main():

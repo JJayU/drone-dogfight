@@ -118,7 +118,7 @@ class CrazyflieEnv(gym.Env):
         # Clip motor commands
         motor_commands = np.array([m1, m2, m3, m4], dtype=np.float32)
         motor_commands = np.clip(motor_commands, 0.0, 1.0)
-        
+        print(f"Motor commands: {motor_commands}")
         # Apply control
         if len(self.data.ctrl) >= 4:
             self.data.ctrl[:4] = motor_commands
