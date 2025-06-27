@@ -131,7 +131,7 @@ def plot_experiment_3_data(file_path, save_path=None):
     axes[1,2].grid(True, alpha=0.3)
     axes[1,2].legend()
     
-    # Overall title
+
     plt.suptitle(f'Experiment 3 - Analysis\nFile: {os.path.basename(file_path)}', 
                  fontsize=16, fontweight='bold')
     

@@ -10,14 +10,12 @@ class RLExperiment:
         self.env = CrazyflieEnv()
         self.model = PPO.load(model_path, env=self.env)
         
-        # Experiment parameters (now step-based for 200Hz simulation) render_mode="human"
-        self.experiment_steps = 2100  # 6000 steps (30 seconds at 200Hz)
-        self.hit_duration_steps = 140  # 400 steps to hold position (2 seconds at 200Hz)
-        self.hit_threshold = 0.3      # 0.3m distance threshold
-        self.yaw_threshold = 0.1      # ~5.7 degrees tolerance for yaw
-        self.simulation_frequency = 70.0  # Hz
+        self.experiment_steps = 1500
+        self.hit_duration_steps = 100
+        self.hit_threshold = 0.3
+        self.yaw_threshold = 0.1
+        self.simulation_frequency = 50.0
         
-        # 16 static targets with orientation (x, y, z, yaw)
         self.defined_targets = [
             [1.0, 1.0, 1.5, 0.0],
             [-1.0, 1.0, 1.0, 0.5],
@@ -37,10 +35,8 @@ class RLExperiment:
             [1.5, 1.5, 1.6, 0.3],
         ]
         
-        # Home position
         self.home_position = [0.0, 0.0, 1.0, 0.0]
         
-        # Experiment state
         self.current_target_index = 0
         self.current_target = None
         self.target_hit_start_step = None
@@ -50,20 +46,17 @@ class RLExperiment:
         self.start_step = 0
         self.current_step = 0
         
-        # Data logging
         self.data_dir = "/home/ws/exp_data"
         self.data_file = None
         self.exp_no = 0
         self.setup_data_logging()
 
     def setup_data_logging(self):
-        """Setup data logging directory"""
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
             print(f"Created data directory: {self.data_dir}")
 
     def start_data_logging(self):
-        """Start logging data to file"""
         filename = f"rl_exp3_data_{self.exp_no}.txt"
         self.data_file_path = os.path.join(self.data_dir, filename)
         self.data_file = open(self.data_file_path, 'w')
@@ -73,9 +66,8 @@ class RLExperiment:
         print(f"Started logging to: {self.data_file_path}")
 
     def log_data(self, step, obs):
-        """Log current data to file"""
         if self.data_file and self.current_target:
-            time_seconds = step / self.simulation_frequency  # Convert steps to seconds
+            time_seconds = step / self.simulation_frequency
             drone_pos = obs[0:3]
             drone_rpy = obs[6:9]
             distance = self.calculate_distance_to_target(drone_pos)
@@ -91,14 +83,12 @@ class RLExperiment:
             self.data_file.write(data_line)
 
     def stop_data_logging(self):
-        """Stop logging and close file"""
         if self.data_file:
             self.data_file.close()
             self.data_file = None
             print(f"Data saved to: {self.data_file_path}")
 
     def next_target(self):
-        """Get next target from the list"""
         if self.current_target_index >= len(self.defined_targets):
             self.current_target_index = 0
         target = self.defined_targets[self.current_target_index]
@@ -108,7 +98,6 @@ class RLExperiment:
         return target
 
     def calculate_distance_to_target(self, drone_pos):
-        """Calculate 3D distance to current target"""
         if self.current_target is None:
             return float('inf')
         dx = drone_pos[0] - self.current_target[0]
@@ -117,17 +106,14 @@ class RLExperiment:
         return math.sqrt(dx**2 + dy**2 + dz**2)
 
     def calculate_yaw_error(self, drone_yaw):
-        """Calculate yaw error to current target"""
         if self.current_target is None:
             return float('inf')
         return abs(self._wrap_angle(self.current_target[3] - drone_yaw))
 
     def check_target_hit(self, drone_pos, drone_yaw):
-        """Check if target is hit and held for required duration"""
         distance = self.calculate_distance_to_target(drone_pos)
         yaw_error = self.calculate_yaw_error(drone_yaw)
         
-        # Check if drone is close enough in position and orientation
         position_ok = distance <= self.hit_threshold
         orientation_ok = yaw_error <= self.yaw_threshold
         
@@ -141,7 +127,6 @@ class RLExperiment:
                 print(f"TARGET HIT! #{self.targets_hit} - Moving to next target")
                 self.current_target = self.next_target()
                 self.is_hitting_target = False
-                # Update environment target
                 self.env.target_position = np.array(self.current_target[0:3])
                 self.env.target_yaw = self.current_target[3]
         else:
@@ -150,11 +135,9 @@ class RLExperiment:
                 self.is_hitting_target = False
 
     def _wrap_angle(self, angle):
-        """Normalize angle to range [-pi, pi]"""
         return np.arctan2(np.sin(angle), np.cos(angle))
 
     def run_experiment(self):
-        """Run the complete experiment"""
         print("\n" + "="*60)
         print("RL Model Experiment - Static Target Challenge (200Hz)")
         print("="*60)
@@ -168,7 +151,6 @@ class RLExperiment:
         print("Press Enter to start...")
         input()
         
-        # Initialize experiment
         self.exp_no += 1
         self.targets_hit = 0
         self.total_targets = 0
@@ -178,7 +160,6 @@ class RLExperiment:
         self.current_step = 0
         self.start_data_logging()
         
-        # Reset environment and set first target
         obs, _ = self.env.reset()
         self.env.target_position = np.array(self.current_target[0:3])
         self.env.target_yaw = self.current_target[3]
@@ -189,32 +170,25 @@ class RLExperiment:
         last_status_step = 0
         
         while self.current_step < self.experiment_steps:
-            # Get action from model
             action, _ = self.model.predict(obs, deterministic=True)
             obs, reward, terminated, truncated, info = self.env.step(action)
             
-            # Extract drone state (fixed index for yaw)
             drone_pos = obs[0:3]
-            drone_yaw = obs[8]  # yaw is at index 8 in RPY according to observation
+            drone_yaw = obs[8]
             
-            # Check target hits
             self.check_target_hit(drone_pos, drone_yaw)
             
-            # Log data every few steps to avoid too much I/O
-            if self.current_step % 10 == 0:  # Log every 10 steps (every 0.05s at 200Hz)
+            if self.current_step % 10 == 0:
                 self.log_data(self.current_step, obs)
             
-            # Reset if terminated/truncated
             if terminated or truncated:
                 elapsed_time = self.current_step / self.simulation_frequency
                 print(f"Environment reset at {elapsed_time:.1f}s")
                 obs, _ = self.env.reset()
-                # Restore current target after reset
                 self.env.target_position = np.array(self.current_target[0:3])
                 self.env.target_yaw = self.current_target[3]
             
-            # Print status every 400 steps (every 2 seconds at 200Hz)
-            if self.current_step - last_status_step >= 400:
+            if self.current_step - last_status_step >= 100:
                 distance = self.calculate_distance_to_target(drone_pos)
                 yaw_error = self.calculate_yaw_error(drone_yaw)
                 remaining_steps = self.experiment_steps - self.current_step
@@ -230,7 +204,6 @@ class RLExperiment:
             
             self.current_step += 1
         
-        # Experiment finished
         print("\n" + "="*60)
         print("EXPERIMENT COMPLETE!")
         print("="*60)
@@ -250,21 +223,18 @@ class RLExperiment:
         
         self.stop_data_logging()
         
-        # Return to home position
         print("Returning to home position...")
         self.return_home()
 
     def return_home(self):
-        """Return drone to home position"""
         self.env.target_position = np.array(self.home_position[0:3])
         self.env.target_yaw = self.home_position[3]
         
-        obs, _ = self.env.reset()  # Reset to ensure clean state
+        obs, _ = self.env.reset()
         
-        # Run for a few steps to reach home (1000 steps = 5 seconds at 200Hz)
         home_steps = 0
         print("Flying home...")
-        while home_steps < 1000:
+        while home_steps < 250:
             action, _ = self.model.predict(obs, deterministic=True)
             obs, reward, terminated, truncated, info = self.env.step(action)
             
@@ -273,7 +243,6 @@ class RLExperiment:
                 self.env.target_position = np.array(self.home_position[0:3])
                 self.env.target_yaw = self.home_position[3]
             
-            # Check if close to home
             drone_pos = obs[0:3]
             distance_to_home = np.linalg.norm(drone_pos - np.array(self.home_position[0:3]))
             if distance_to_home < 0.2:
@@ -285,7 +254,6 @@ class RLExperiment:
         print("Returned to home position")
 
     def print_targets_info(self):
-        """Print information about all targets"""
         print("\nPredefined targets:")
         print("Index | X     | Y     | Z     | Yaw   | Distance from origin")
         print("-" * 60)
@@ -296,32 +264,25 @@ class RLExperiment:
         print("-" * 60)
 
     def close(self):
-        """Clean up resources"""
         self.stop_data_logging()
         self.env.close()
 
 
 def main():
-    # Configuration
     models_dir = "models/PPO"
-    model_path = f"{models_dir}/zmiejszeniev2"  # Path to the model file (without .zip)
+    model_path = f"{models_dir}/zmiejszeniev2"
     
-    # Check if model exists
     if not os.path.exists(model_path + ".zip"):
         print(f"Error: Model not found at {model_path}.zip")
         print("Please check the model path and ensure the model file exists.")
         return
     
-    # Create and run experiment
     experiment = RLExperiment(model_path)
     
     try:
-        # Show targets information
         experiment.print_targets_info()
-        
         experiment.run_experiment()
         
-        # Ask if user wants to run another experiment
         while True:
             response = input("\nRun another experiment? (y/n): ").lower().strip()
             if response == 'y':

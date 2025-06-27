@@ -13,18 +13,15 @@ class CrazyflieEnv(gym.Env):
         super().__init__()
         self.render_mode = render_mode
 
-        self.dt = 1.0 / 200.0  # 200 Hz
-
+        self.dt = 1.0 / 200.0 
         xml_path = '/home/ws/src/drone_mujoco/model/scene.xml'
         
-        # Check if file exists before loading
         if not os.path.exists(xml_path):
             raise FileNotFoundError(f"MuJoCo XML file not found at: {xml_path}")
             
         self.model = mujoco.MjModel.from_xml_path(xml_path)
         self.data = mujoco.MjData(self.model)
         
-        # Set simulation timestep to match our control frequency
         self.model.opt.timestep = self.dt
 
         self.viewer = None
@@ -40,20 +37,19 @@ class CrazyflieEnv(gym.Env):
         action_high = np.array([1.0, 5.0, 5.0, 5.0], dtype=np.float32)
         self.action_space = spaces.Box(low=action_low, high=action_high, dtype=np.float32)
 
-        # Observation: pos (3) + vel (3) + RPY (3) + ang vel (3) + local_dist (3) + target_yaw (1) = 16
+        # Observation: pos (3) + vel (3) + RPY (3) + ang vel (3) + local_dist (3) + error_yaw (1) = 16
         obs_high = np.array([np.inf] * 16, dtype=np.float32)
         self.observation_space = spaces.Box(low=-obs_high, high=obs_high, dtype=np.float32)
 
-        self.target_position = np.array([0.0, 0.0, 1.0])
-        self.target_yaw = 0.0  # Target yaw in radians
+        self.target_position = np.array([0.0, 0.0, 2.0])
+        self.target_yaw = 0.0  
         
         self.no_steps = 0
         self.prev_dist_to_target = 0
         
-        self.target_hold_steps = int(2.0 / self.dt)  # 2 seconds at 30Hz = 60 steps
+        self.target_hold_steps = int(2.0 / self.dt) 
         self.at_target_counter = 0
 
-        # Initialize random seed
         self.np_random = None
 
     def _mujoco_quat_to_scipy(self, mj_quat):
@@ -63,7 +59,6 @@ class CrazyflieEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         
-        # Initialize random number generator
         if seed is not None:
             self.np_random = np.random.RandomState(seed)
         else:
@@ -72,7 +67,7 @@ class CrazyflieEnv(gym.Env):
         mujoco.mj_resetData(self.model, self.data)
 
         # Reset drone position and velocity
-        self.data.qpos[0:3] = np.array([0.0, 0.0, 1.0])
+        self.data.qpos[0:3] = np.array([0.0, 0.0, 2.0])
         self.data.qpos[3:7] = np.array([1.0, 0.0, 0.0, 0.0])  # MuJoCo identity quaternion [w,x,y,z]
         self.data.qvel[:] = 0.0
         self.data.ctrl[:] = 0.0
@@ -86,10 +81,8 @@ class CrazyflieEnv(gym.Env):
             self.np_random.uniform(0.5, 2.0)
         ])
         
-        # Random target yaw
         self.target_yaw = self.np_random.uniform(-np.pi, np.pi)
         
-        # Forward simulation to settle physics
         mujoco.mj_forward(self.model, self.data)
         
         self.prev_dist_to_target = np.linalg.norm(self.data.qpos[0:3] - self.target_position)
@@ -99,7 +92,6 @@ class CrazyflieEnv(gym.Env):
         return observation, info
 
     def step(self, action):
-        # Ensure action is numpy array with correct dtype
         action = np.array(action, dtype=np.float32)
         
         thrust = np.clip(action[0], 0.0, 1.0)
@@ -115,12 +107,10 @@ class CrazyflieEnv(gym.Env):
         m3 = thrust + k_mix * (roll_rate - pitch_rate - yaw_rate)   # back-left
         m4 = thrust + k_mix * (roll_rate + pitch_rate + yaw_rate)   # front-left
         
-        # Clip motor commands
         
         motor_commands = np.array([m1, m2, m3, m4], dtype=np.float32)
         motor_commands = np.clip(motor_commands, 0.0, 1.0)
-        print(f"Motor commands: {motor_commands}")
-        # Apply control
+
         if len(self.data.ctrl) >= 4:
             self.data.ctrl[:4] = motor_commands
         else:
@@ -149,7 +139,6 @@ class CrazyflieEnv(gym.Env):
             self.at_target_counter += 1
             if self.at_target_counter == self.target_hold_steps:
                 reward += 1000.0
-                # Set new target
                 self.target_position = np.array([
                     self.np_random.uniform(-3.0, 3.0),
                     self.np_random.uniform(-3.0, 3.0),
@@ -162,7 +151,6 @@ class CrazyflieEnv(gym.Env):
 
         self.prev_dist_to_target = np.linalg.norm(self.data.qpos[0:3] - self.target_position)
         
-        # Render if in human mode
         if self.render_mode == "human":
             self.render()
 
@@ -174,15 +162,13 @@ class CrazyflieEnv(gym.Env):
         mj_quat = self.data.qpos[3:7].copy()
         ang_vel = self.data.qvel[3:6].copy()
         
-        # Convert MuJoCo quaternion to scipy format
         scipy_quat = self._mujoco_quat_to_scipy(mj_quat)
         
         # Convert quaternion to Euler angles (roll, pitch, yaw)
         try:
-            scipy_quat = scipy_quat / np.linalg.norm(scipy_quat)  # Normalize quaternion
+            scipy_quat = scipy_quat / np.linalg.norm(scipy_quat)  
             rpy = R.from_quat(scipy_quat).as_euler('xyz', degrees=False)
         except (ValueError, np.linalg.LinAlgError):
-            # Handle invalid quaternion
             rpy = np.array([0.0, 0.0, 0.0])
         
         # Calculate local distance to target
@@ -191,10 +177,8 @@ class CrazyflieEnv(gym.Env):
             rot = R.from_quat(scipy_quat).as_matrix()
             local_dist = rot.T @ global_dist
         except (ValueError, np.linalg.LinAlgError):
-            # Handle invalid quaternion
             local_dist = global_dist
         
-        # Add target yaw to observation
         current_yaw = rpy[2]
         yaw_error = self._wrap_angle(self.target_yaw - current_yaw)
 
@@ -221,34 +205,28 @@ class CrazyflieEnv(gym.Env):
         ang_vel = obs[9:12]
         current_yaw = rpy[2]
         
-        # Position error
         pos_error = np.linalg.norm(pos - self.target_position)
         
-        # Orientation error - we want to maintain roll=0, pitch=0
         roll_pitch_error = np.linalg.norm(rpy[0:2])
         
-        # Yaw error
         yaw_error = self._wrap_angle(self.target_yaw - current_yaw)
         
-        # Velocity penalties
         lin_vel_penalty = 0.01 * np.linalg.norm(lin_vel)
         ang_vel_penalty = 0.01 * np.linalg.norm(ang_vel)
         
-        # Distance change reward
         current_dist = np.linalg.norm(pos - self.target_position)
         delta_dist = self.prev_dist_to_target - current_dist
         
         # Composite reward function
         reward = (
-            -6.0 * pos_error +           # main penalty for distance from target
+            -6.0 * pos_error +            # main penalty for distance from target
             -5.0 * roll_pitch_error +     # penalty for deviation from level
             -5.0 * abs(yaw_error) +       # penalty for yaw error
             -lin_vel_penalty +            # penalty for excessive linear velocity
-            -3*ang_vel_penalty +            # penalty for excessive angular velocity
+            -3 * ang_vel_penalty +        # penalty for excessive angular velocity
             2.0 * delta_dist              # reward for approaching target
         )
         
-        # Large penalty for termination
         if self._check_termination(obs):
             reward -= 1000.0
         
@@ -257,8 +235,6 @@ class CrazyflieEnv(gym.Env):
     
     def _check_termination(self, obs):
         x, y, z = obs[0:3]
-        # Check if drone is out of bounds
-        # return False
         return z < 0.2 or z > 5.0 or x < -5.0 or x > 5.0 or y < -5.0 or y > 5.0
 
     def render(self):

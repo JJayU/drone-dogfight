@@ -12,7 +12,7 @@ os.makedirs(logdir, exist_ok=True)
 
 # --- Inicjalizacja środowiska ---
 env = CrazyflieEnv(render_mode=None)
-check_env(env)  # Opcjonalnie: sprawdzenie zgodności Gym
+check_env(env)  
 env.reset()
 
 # --- Konfiguracja modelu ---
