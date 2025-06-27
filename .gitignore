@@ -3,6 +3,7 @@ build/
 install/
 log/
 .vscode/
+logs/
 c_generated_code/
 exp*_data*
 

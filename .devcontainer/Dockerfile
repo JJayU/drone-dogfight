@@ -47,7 +47,10 @@ RUN pip3 install --upgrade --no-cache-dir \
     gymnasium \
     pygame
 
-# Build ROS2 workspace
+RUN pip install stable-baselines3[extra] \
+    pip install tensorboard
+
+# 📌 Budowa workspace ROS2
 RUN . /opt/ros/humble/setup.sh 
 
 # Setup ROS2 paths in bashrc
