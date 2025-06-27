@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'drone_mujoco'
+package_name = 'mpc_controller'
 
 setup(
     name=package_name,
@@ -19,7 +19,8 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
-            'sim = drone_mujoco.sim:main'
+            '3dof = mpc_controller.3dof:main',
+            '6dof = mpc_controller.6dof:main'
         ],
     },
 )

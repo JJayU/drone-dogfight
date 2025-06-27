@@ -31,7 +31,7 @@ class TargetPublisherNode(Node):
         self.target_pub = self.create_publisher(PointStamped, '/target_point', qos)
         self.create_timer(0.02, self.loop)
         
-        self.dynamic_target = False
+        self.dynamic_target = True
 
     def calculate_position(self):
         
@@ -52,19 +52,19 @@ class TargetPublisherNode(Node):
             # Movement on each side of square
             if segment == 0:   
                 x = 0.0
-                y = 1.0
+                y = 2.0
                 z = self.z_base + self.square_size * smooth_t
             elif segment == 1:  
                 x = self.square_size * smooth_t
-                y = 1.0
+                y = 2.0
                 z = self.z_base + self.square_size
             elif segment == 2:  
                 x = self.square_size
-                y = 1.0
+                y = 2.0
                 z = self.z_base + self.square_size * (1 - smooth_t)
             else:             
                 x = self.square_size * (1 - smooth_t)
-                y = 1.0
+                y = 2.0
                 z = self.z_base
         
         else:

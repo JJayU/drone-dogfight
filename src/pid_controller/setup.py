@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'drone_mujoco'
+package_name = 'pid_controller'
 
 setup(
     name=package_name,
@@ -17,9 +17,10 @@ setup(
     maintainer_email='jakub.junkiert@gmail.com',
     description='TODO: Package description',
     license='Apache-2.0',
+    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'sim = drone_mujoco.sim:main'
+            'controller = pid_controller.drone_teleop:main'
         ],
     },
 )
